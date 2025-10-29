@@ -27,6 +27,12 @@ import {
   PromptInput,
   ImageUpload,
 } from "@/components/frames/FrameUI";
+import {
+  initializeMiniApp,
+  getUserContext,
+  isInMiniApp,
+  trackEvent,
+} from "@/lib/miniapp";
 
 export default function FrameContent() {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
@@ -55,8 +61,23 @@ export default function FrameContent() {
   useEffect(() => {
     const init = async () => {
       try {
-        const context = await FrameSDK.context;
-        setContextData(context as unknown as FarcasterContext);
+        // Check if we're in a Mini App context
+        const inMiniApp = isInMiniApp();
+
+        if (inMiniApp) {
+          // Initialize Mini App SDK
+          await initializeMiniApp();
+
+          // Get user context
+          const userContext = await getUserContext();
+          if (userContext) {
+            setContextData(userContext as unknown as FarcasterContext);
+          }
+        } else {
+          // Fallback to regular Frame SDK
+          const context = await FrameSDK.context;
+          setContextData(context as unknown as FarcasterContext);
+        }
 
         // Hide splash screen after UI renders
         setTimeout(() => {
@@ -64,13 +85,20 @@ export default function FrameContent() {
           FrameSDK.actions.ready();
           setIsSDKLoaded(true);
         }, 500);
+
+        // Track Mini App initialization
+        trackEvent("miniapp_initialized", {
+          isMiniApp: inMiniApp,
+          hasContext: Boolean(contextData),
+        });
       } catch (error) {
-        console.error("Error initializing Frame SDK:", error);
+        console.error("Error initializing Frame/Mini App SDK:", error);
         setIsSDKLoaded(true); // Still set to true so UI renders
       }
     };
 
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Check network on mount and when connection changes
@@ -299,7 +327,7 @@ export default function FrameContent() {
       address,
       groveUrl,
       setIsMinting,
-      setMintResult
+      setMintResult,
     );
   };
 
@@ -326,13 +354,13 @@ export default function FrameContent() {
       address,
       groveUrl,
       setIsMinting,
-      setMintResult
+      setMintResult,
     );
   };
 
   const postMessageToParent = (
     action: string,
-    data: Record<string, unknown>
+    data: Record<string, unknown>,
   ) => {
     if (window.parent) {
       window.parent.postMessage(
@@ -340,7 +368,7 @@ export default function FrameContent() {
           action,
           data,
         },
-        "*"
+        "*",
       );
     }
   };
@@ -360,6 +388,13 @@ export default function FrameContent() {
     setGeneratedImage(null);
     setGroveUrl(null);
     setMintResult(null);
+
+    // Track generation start
+    trackEvent("generation_started", {
+      hasPrompt: !!prompt.trim(),
+      hasUploadedImage: !!uploadedImage,
+      generationType: "wowowify",
+    });
     setIsGhiblify(true);
 
     try {
@@ -396,7 +431,7 @@ export default function FrameContent() {
     } catch (error) {
       console.error("Error transforming image:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to transform image"
+        error instanceof Error ? error.message : "Failed to transform image",
       );
       setIsGhiblify(false);
     } finally {

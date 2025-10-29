@@ -1,18 +1,39 @@
 {
-    "accountAssociation": {
-        "header": "eyJmaWQiOjUyNTQsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg4QjAzQTJDMzY1YzI2MUFlQmU2ODQyMjREQkI2Qzk1OTJhQkNkRkIyIn0",
-        "payload": "eyJkb21haW4iOiJ3b3dvd2lmeS52ZXJjZWwuYXBwIn0",
-        "signature": "MHg1ODdhYzM5NzhmZWZkZWNiNTExMDk5MDk0NjgxMGMzYTgyNjRiZmNiNTZhYTFmYmNhMjI1YmYwOTcyZTI5OTExNzQzZTZjZTUxM2E0MzZiN2Q0MTIyNzAxNWI0MWVjMzU1NzI1NTZiNzBkNjA2ZDg1NTQzM2Y3NzFlMjg0YWZjYTFi"
+  "accountAssociation": {
+    "header": "eyJmaWQiOjUyNTQsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg4QjAzQTJDMzY1YzI2MUFlQmU2ODQyMjREQkI2Qzk1OTJhQkNkRkIyIn0",
+    "payload": "eyJkb21haW4iOiJ3b3dvd2lmeS52ZXJjZWwuYXBwIn0",
+    "signature": "MHg1ODdhYzM5NzhmZWZkZWNiNTExMDk5MDk0NjgxMGMzYTgyNjRiZmNiNTZhYTFmYmNhMjI1YmYwOTcyZTI5OTExNzQzZTZjZTUxM2E0MzZiN2Q0MTIyNzAxNWI0MWVjMzU1NzI1NTZiNzBkNjA2ZDg1NTQzM2Y3NzFlMjg0YWZjYTFi"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "WOWOWIFY",
+    "description": "Create amazing visual overlays and effects directly in Farcaster. Transform your images with cool wowowify effects in seconds.",
+    "iconUrl": "https://wowowify.vercel.app/wowwowowify.png",
+    "homeUrl": "https://wowowify.vercel.app/frames",
+    "imageUrl": "https://wowowify.vercel.app/previews/frame-preview.png",
+    "buttonTitle": "Generate Image",
+    "splashImageUrl": "https://wowowify.vercel.app/wowwowowify.png",
+    "splashBackgroundColor": "#131313",
+    "webhookUrl": "https://wowowify.vercel.app/api/farcaster/webhook",
+    "author": {
+      "name": "WOWOWIFY Team",
+      "url": "https://wowowify.vercel.app"
     },
-    "frame": {
-        "version": "1",
-        "name": "WOWOWIFY",
-        "iconUrl": "https://wowowify.vercel.app/wowwowowify.png",
-        "homeUrl": "https://wowowify.vercel.app/frames",
-        "imageUrl": "https://wowowify.vercel.app/wowwowowify.png",
-        "buttonTitle": "Generate Image",
-        "splashImageUrl": "https://wowowify.vercel.app/wowwowowify.png",
-        "splashBackgroundColor": "#131313",
-        "webhookUrl": "https://wowowify.vercel.app/api/farcaster/webhook"
-    }
+    "categories": ["creative", "tools", "media"],
+    "tags": ["image", "overlay", "effects", "visual", "creative", "art"],
+    "primaryCategory": "creative",
+    "screenshots": ["https://wowowify.vercel.app/previews/frame-preview.png"],
+    "permissions": ["identity", "wallet"]
+  },
+  "frame": {
+    "version": "1",
+    "name": "WOWOWIFY",
+    "iconUrl": "https://wowowify.vercel.app/wowwowowify.png",
+    "homeUrl": "https://wowowify.vercel.app/frames",
+    "imageUrl": "https://wowowify.vercel.app/wowwowowify.png",
+    "buttonTitle": "Generate Image",
+    "splashImageUrl": "https://wowowify.vercel.app/wowwowowify.png",
+    "splashBackgroundColor": "#131313",
+    "webhookUrl": "https://wowowify.vercel.app/api/farcaster/webhook"
+  }
 }

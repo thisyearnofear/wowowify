@@ -15,6 +15,7 @@
   "dependencies": {
     "@farcaster/frame-sdk": "^0.0.31",
     "@farcaster/frame-wagmi-connector": "^0.0.19",
+    "@farcaster/miniapp-sdk": "^0.1.10",
     "@google/generative-ai": "^0.23.0",
     "@lens-chain/storage-client": "^1.0.3",
     "@neynar/nodejs-sdk": "^2.19.0",
