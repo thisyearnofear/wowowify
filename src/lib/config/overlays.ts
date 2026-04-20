@@ -80,6 +80,23 @@ export const PRESET_OVERLAY_PATHS: Record<string, string> = {
   baseify: "/base/baseify.png",
 };
 
+// Human-readable descriptions for UI tooltips
+export const OVERLAY_DESCRIPTIONS: Record<string, string> = {
+  degenify: "Apply the classic Degen hat overlay",
+  higherify: "Stamp the Higher arrows watermark",
+  scrollify: "Add the Scroll zk-rollup badge",
+  lensify: "Overlay the Lens Protocol logo",
+  higherise: "Apply the Higherise mantra badge",
+  dickbuttify: "Stamp the iconic Dickbutt meme",
+  nikefy: "Add the Nike-style swoosh overlay",
+  nounify: "Overlay the Nouns DAO glasses",
+  baseify: "Stamp the Base chain badge",
+  clankerify: "Add the Clanker bot overlay",
+  mantleify: "Stamp the Mantle L2 badge",
+  ghiblify: "AI transform into Studio Ghibli art style",
+  wowowify: "Default mode — no overlay applied",
+};
+
 // Default prompts when no image/prompt is provided per overlay mode
 export const DEFAULT_OVERLAY_PROMPTS: Record<string, string> = {
   higherify: "a mountain landscape with clear sky",

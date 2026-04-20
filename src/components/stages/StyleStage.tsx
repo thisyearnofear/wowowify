@@ -1,7 +1,7 @@
 import React from "react";
-import { OverlayMode, OVERLAY_COLORS } from "@/lib/config/overlays";
+import { OverlayMode, OVERLAY_COLORS, OVERLAY_DESCRIPTIONS } from "@/lib/config/overlays";
 
-/** Reusable overlay mode button with color theming from shared config */
+/** Reusable overlay mode button with color theming and tooltip */
 function OverlayButton({
   mode: currentMode,
   onClick,
@@ -15,16 +15,27 @@ function OverlayButton({
 }) {
   const colors = OVERLAY_COLORS[name] || OVERLAY_COLORS.wowowify;
   const isActive = currentMode === name;
+  const description = OVERLAY_DESCRIPTIONS[name] || "";
+  const tooltipId = `tooltip-${name}`;
   return (
-    <button
-      data-theme={name}
-      onClick={() => onClick(name)}
-      className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
-        ${isActive ? colors.active : `${colors.bg} ${colors.text} ${colors.hover}`}`}
-    >
-      <span className="text-lg">{icon}</span>
-      <span className="text-xs font-medium capitalize">{name}</span>
-    </button>
+    <div className="tooltip-wrapper">
+      <button
+        data-theme={name}
+        onClick={() => onClick(name)}
+        title={description}
+        aria-describedby={description ? tooltipId : undefined}
+        className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
+          ${isActive ? colors.active : `${colors.bg} ${colors.text} ${colors.hover}`}`}
+      >
+        <span className="text-lg">{icon}</span>
+        <span className="text-xs font-medium capitalize">{name}</span>
+      </button>
+      {description && (
+        <span id={tooltipId} role="tooltip" className="tooltip">
+          {description}
+        </span>
+      )}
+    </div>
   );
 }
 
