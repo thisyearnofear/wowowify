@@ -5,6 +5,14 @@ import { StyleStage } from "./stages/StyleStage";
 import { AdjustStage } from "./stages/AdjustStage";
 import { GenerateModal } from "./modals/GenerateModal";
 import { LoadingText } from "./LoadingText";
+import {
+  OverlayMode,
+  PRESET_OVERLAY_PATHS,
+  AI_TRANSFORM_MODES,
+} from "@/lib/config/overlays";
+
+// Re-export for backward compatibility with components that import from here
+export type { OverlayMode } from "@/lib/config/overlays";
 
 interface OverlayControls {
   scale: number;
@@ -14,20 +22,6 @@ interface OverlayControls {
   overlayAlpha: number;
 }
 
-export type OverlayMode =
-  | "degenify"
-  | "higherify"
-  | "wowowify"
-  | "scrollify"
-  | "lensify"
-  | "higherise"
-  | "dickbuttify"
-  | "nikefy"
-  | "nounify"
-  | "baseify"
-  | "clankerify"
-  | "mantleify"
-  | "ghiblify";
 export type Stage = "initial" | "style" | "adjust";
 
 export default function ImageOverlay() {
@@ -65,8 +59,8 @@ export default function ImageOverlay() {
   const loadPresetOverlay = async (presetMode: OverlayMode) => {
     setMode(presetMode);
 
-    // For ghiblify, we don't need a preset overlay image
-    if (presetMode === "ghiblify") {
+    // For AI transforms, we don't need a preset overlay image
+    if (AI_TRANSFORM_MODES.includes(presetMode)) {
       if (!baseImage || !basePreviewUrl) {
         alert("Please upload an image first");
         return;
@@ -121,16 +115,7 @@ export default function ImageOverlay() {
       return;
     }
 
-    const presetPath =
-      presetMode === "degenify"
-        ? "/degen/degenify.png"
-        : presetMode === "higherify"
-        ? "/higher/arrows/Arrow-png-white.png"
-        : presetMode === "scrollify"
-        ? "/scroll/scrollify.png"
-        : presetMode === "baseify"
-        ? "/base/baseify.png"
-        : "";
+    const presetPath = PRESET_OVERLAY_PATHS[presetMode] || "";
 
     if (presetPath) {
       try {

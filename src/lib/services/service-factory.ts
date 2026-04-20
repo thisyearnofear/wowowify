@@ -7,28 +7,17 @@ import { logger } from "../logger";
 export type InterfaceType = "web" | "farcaster" | "telegram";
 
 /**
- * Factory for creating services
+ * Singleton ImageService instance shared across all interface types.
+ * All interfaces use the same ImageService — this is a lazy singleton accessor.
  */
-export class ServiceFactory {
-  private static serviceInstance: ImageService | null = null;
+let serviceInstance: ImageService | null = null;
 
-  /**
-   * Get a service for the specified interface type
-   */
-  public static getServiceForInterface(
-    interfaceType: InterfaceType
-  ): ImageService {
-    // For now, we have a single image service implementation that handles all interfaces
-    if (!this.serviceInstance) {
-      logger.info(
-        `Creating new ImageService instance for ${interfaceType} interface`
-      );
-      this.serviceInstance = new ImageService();
-    } else {
-      logger.info(
-        `Reusing existing ImageService instance for ${interfaceType} interface`
-      );
-    }
-    return this.serviceInstance;
+export function getImageService(interfaceType: InterfaceType = "web"): ImageService {
+  if (!serviceInstance) {
+    logger.info(`Creating ImageService instance for ${interfaceType} interface`);
+    serviceInstance = new ImageService();
+  } else {
+    logger.info(`Reusing ImageService instance for ${interfaceType} interface`);
   }
+  return serviceInstance;
 }

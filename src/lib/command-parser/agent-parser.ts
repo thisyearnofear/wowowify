@@ -1,7 +1,7 @@
 import { ParsedCommand } from "../agent-types";
 import { logger } from "../logger";
 import { BaseCommandParser } from "./base-parser";
-import { OverlayMode } from "@/components/ImageOverlay";
+import { OverlayMode } from "@/lib/config/overlays";
 
 /**
  * Specialized command parser for the agent frontend

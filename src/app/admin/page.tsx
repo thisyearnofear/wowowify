@@ -169,17 +169,6 @@ function AdminContent() {
 export default function AdminPage() {
   return (
     <Web3Provider>
-      <style jsx global>{`
-        /* Fix for disappearing cursor */
-        * {
-          cursor: auto !important;
-        }
-        a,
-        button,
-        [role="button"] {
-          cursor: pointer !important;
-        }
-      `}</style>
       <AdminContent />
     </Web3Provider>
   );

@@ -1,6 +1,6 @@
 import { ParsedCommand } from "../agent-types";
 import { logger } from "../logger";
-import { OverlayMode } from "@/components/ImageOverlay";
+import { OverlayMode, OVERLAY_KEYWORDS } from "@/lib/config/overlays";
 
 /**
  * Base class for command parsers
@@ -147,20 +147,7 @@ export class BaseCommandParser {
   protected CAPTION_PATTERN = /CAPTION:\s*(.*?)(?=PROMPT:|OVERLAY:|WOWOW:|$)/i;
   protected WOWOW_PATTERN = /WOWOW:\s*(.*?)(?=PROMPT:|CAPTION:|TEXT:|$)/i;
 
-  protected overlayKeywords = [
-    "higherify",
-    "degenify",
-    "scrollify",
-    "lensify",
-    "higherise",
-    "dickbuttify",
-    "nikefy",
-    "nounify",
-    "baseify",
-    "clankerify",
-    "mantleify",
-    "ghiblify",
-  ];
+  protected overlayKeywords = [...OVERLAY_KEYWORDS];
 
   /**
    * Parse a command string into a structured ParsedCommand object

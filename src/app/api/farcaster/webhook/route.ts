@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { NeynarAPIClient } from "@neynar/nodejs-sdk";
 import { createHmac } from "crypto";
-import { ServiceFactory } from "@/lib/services";
+import { getImageService } from "@/lib/services";
 
 // Mark as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";
@@ -286,7 +286,7 @@ const verifyWebhookSignature = (
 // Process the command
 async function processCommand(commandText: string) {
   // Get the appropriate service for Farcaster interface
-  const imageService = ServiceFactory.getServiceForInterface("farcaster");
+  const imageService = getImageService("farcaster");
 
   // Log the raw command for debugging
   logger.info("Processing raw Farcaster command", { commandText });
@@ -310,6 +310,7 @@ async function processCommand(commandText: string) {
     "baseify",
     "clankerify",
     "mantleify",
+    "ghiblify",
   ];
   const overlayFollowedByNoun = new RegExp(
     `^(${overlayKeywords.join("|")})\\s+(a|an)\\s+\\w+`,
@@ -398,22 +399,17 @@ async function processCommand(commandText: string) {
 
     // If we don't have a prompt, create a default one based on the overlay
     if (!parsedCommand.prompt || parsedCommand.prompt.length < 3) {
-      let defaultPrompt = "a simple background";
-      if (parsedCommand.overlayMode === "higherify") {
-        defaultPrompt = "a mountain landscape with clear sky";
-      } else if (parsedCommand.overlayMode === "degenify") {
-        defaultPrompt = "a colorful abstract pattern";
-      } else if (parsedCommand.overlayMode === "scrollify") {
-        defaultPrompt = "a minimalist tech background";
-      } else if (parsedCommand.overlayMode === "lensify") {
-        defaultPrompt = "a professional photography background";
-      } else if (parsedCommand.overlayMode === "baseify") {
-        defaultPrompt = "a blockchain themed background";
-      } else if (parsedCommand.overlayMode === "dickbuttify") {
-        defaultPrompt = "a meme-worthy background";
-      } else if (parsedCommand.overlayMode === "mantleify") {
-        defaultPrompt = "a digital landscape with mountains";
-      }
+      const DEFAULT_PROMPTS: Record<string, string> = {
+        higherify: "a mountain landscape with clear sky",
+        degenify: "a colorful abstract pattern",
+        scrollify: "a minimalist tech background",
+        lensify: "a professional photography background",
+        baseify: "a blockchain themed background",
+        dickbuttify: "a meme-worthy background",
+        mantleify: "a digital landscape with mountains",
+        ghiblify: "a serene natural landscape",
+      };
+      const defaultPrompt = DEFAULT_PROMPTS[parsedCommand.overlayMode] || "a simple background";
 
       parsedCommand.prompt = defaultPrompt;
     }
@@ -618,7 +614,7 @@ export async function POST(request: Request) {
       const baseUrl = APP_URL;
 
       // Get the image service for Farcaster interface
-      const imageService = ServiceFactory.getServiceForInterface("farcaster");
+      const imageService = getImageService("farcaster");
 
       // Special handling for ghiblify command
       if (commandText.toLowerCase().includes("ghiblify")) {

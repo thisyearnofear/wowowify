@@ -1,15 +1,19 @@
 export default function Footer() {
   return (
-    <footer className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-sm border-t">
-      <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
-        <a
-          href="https://hey.xyz/u/papajams"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-violet-600 transition-colors"
-        >
-          papa
-        </a>
+    <footer className="glass border-t" style={{ borderColor: "var(--color-border)" }}>
+      <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="flex items-center justify-between text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          <span className="opacity-60">built with ✨ by</span>
+          <a
+            href="https://hey.xyz/u/papajams"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium transition-colors hover:opacity-80"
+            style={{ color: "var(--color-wowowify)" }}
+          >
+            papa
+          </a>
+        </div>
       </div>
     </footer>
   );

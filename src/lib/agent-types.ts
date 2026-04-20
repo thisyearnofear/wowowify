@@ -1,4 +1,4 @@
-import { OverlayMode } from "@/components/ImageOverlay";
+import { OverlayMode } from "@/lib/config/overlays";
 
 export interface AgentCommand {
   command: string;

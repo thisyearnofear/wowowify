@@ -3,6 +3,7 @@ import { logger } from "./logger";
 import { v4 as uuidv4 } from "uuid";
 import canvas from "canvas";
 import { storeImage } from "./image-store";
+import { OVERLAY_URLS } from "./config/overlays";
 import { CanvasRenderingContext2D as NodeCanvasRenderingContext2D } from "canvas";
 import fs from "fs";
 import path from "path";
@@ -182,28 +183,21 @@ ensureFontsAreRegistered().catch((err) => {
   });
 });
 
-// For serverless environment, we'll use these URLs for overlays
-const OVERLAY_URLS = {
-  degenify: "https://wowowifyer.vercel.app/degen/degenify.png",
-  higherify: "https://wowowifyer.vercel.app/higher/arrows/Arrow-png-white.png",
-  scrollify: "https://wowowifyer.vercel.app/scroll/scrollify.png",
-};
-
 // Preload overlay images to speed up processing
-const OVERLAY_PROMISES = {
-  degenify: loadImage(OVERLAY_URLS.degenify).catch((err): null => {
-    logger.error("Failed to preload degenify overlay", { error: err.message });
-    return null;
-  }),
-  higherify: loadImage(OVERLAY_URLS.higherify).catch((err): null => {
-    logger.error("Failed to preload higherify overlay", { error: err.message });
-    return null;
-  }),
-  scrollify: loadImage(OVERLAY_URLS.scrollify).catch((err): null => {
-    logger.error("Failed to preload scrollify overlay", { error: err.message });
-    return null;
-  }),
-};
+const OVERLAY_PROMISES: Record<string, Promise<canvas.Image | null>> = {};
+
+// Lazy-initialize overlay preloads on first access
+function getOverlayPromise(mode: string): Promise<canvas.Image | null> | null {
+  const url = OVERLAY_URLS[mode];
+  if (!url) return null;
+  if (!OVERLAY_PROMISES[mode]) {
+    OVERLAY_PROMISES[mode] = loadImage(url).catch((err): null => {
+      logger.error(`Failed to preload ${mode} overlay`, { error: err.message });
+      return null;
+    });
+  }
+  return OVERLAY_PROMISES[mode];
+}
 
 interface ProcessResult {
   resultUrl: string;
@@ -388,19 +382,11 @@ export async function processImage(
 
       try {
         // Try to get the preloaded overlay image
-        let overlayImage = null;
-        if (command.overlayMode === "degenify") {
-          overlayImage = await OVERLAY_PROMISES.degenify;
-        } else if (command.overlayMode === "higherify") {
-          overlayImage = await OVERLAY_PROMISES.higherify;
-        } else if (command.overlayMode === "scrollify") {
-          overlayImage = await OVERLAY_PROMISES.scrollify;
-        }
+        let overlayImage = await getOverlayPromise(command.overlayMode);
 
         // If preloaded image failed, try to load it directly
         if (!overlayImage) {
-          const overlayUrl =
-            OVERLAY_URLS[command.overlayMode as keyof typeof OVERLAY_URLS];
+          const overlayUrl = OVERLAY_URLS[command.overlayMode];
           if (!overlayUrl) {
             throw new Error(`Unsupported overlay mode: ${command.overlayMode}`);
           }

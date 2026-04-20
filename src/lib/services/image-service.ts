@@ -12,54 +12,13 @@ import { parseCommand } from "@/lib/command-parser/index";
 import { InterfaceType } from "@/lib/command-parser/index";
 import { storeImageUrl } from "@/lib/image-history";
 import { ghibliService } from "./ghibli-service";
+import {
+  OVERLAY_URLS,
+  DEFAULT_OVERLAY_PROMPTS,
+  OVERLAY_KEYWORDS,
+} from "@/lib/config/overlays";
 
-// For serverless environment, we'll use these URLs for overlays
-const OVERLAY_URLS = {
-  degenify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/degen/degenify.png"
-      : "/degen/degenify.png",
-  higherify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/higher/arrows/Arrow-png-white.png"
-      : "/higher/arrows/Arrow-png-white.png",
-  scrollify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/scroll/scrollify.png"
-      : "/scroll/scrollify.png",
-  lensify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/lens/lensify.png"
-      : "/lens/lensify.png",
-  higherise:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/higher/mantra/higherise.png"
-      : "/higher/mantra/higherise.png",
-  dickbuttify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/dickbutt/dickbuttify.png"
-      : "/dickbutt/dickbuttify.png",
-  nikefy:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/nike/nikefy.png"
-      : "/nike/nikefy.png",
-  nounify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/nouns/nounify.png"
-      : "/nouns/nounify.png",
-  baseify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/base/baseify.png"
-      : "/base/baseify.png",
-  clankerify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/clanker/clankerify.png"
-      : "/clanker/clankerify.png",
-  mantleify:
-    process.env.NODE_ENV === "production"
-      ? "https://wowowifyer.vercel.app/mantle/mantleify.png"
-      : "/mantle/mantleify.png",
-};
+// OVERLAY_URLS now lives in @/lib/config/overlays — single source of truth
 
 // Timeout for image processing
 const TIMEOUT_MS = 30000;
@@ -157,24 +116,9 @@ export class ImageService {
           parsedCommand.action = "generate";
 
           // Create a default prompt based on the overlay type
-          let defaultPrompt = "a simple background";
-          if (parsedCommand.overlayMode === "higherify") {
-            defaultPrompt = "a mountain landscape with clear sky";
-          } else if (parsedCommand.overlayMode === "degenify") {
-            defaultPrompt = "a colorful abstract pattern";
-          } else if (parsedCommand.overlayMode === "scrollify") {
-            defaultPrompt = "a minimalist tech background";
-          } else if (parsedCommand.overlayMode === "lensify") {
-            defaultPrompt = "a professional photography background";
-          } else if (parsedCommand.overlayMode === "baseify") {
-            defaultPrompt = "a blockchain themed background";
-          } else if (parsedCommand.overlayMode === "dickbuttify") {
-            defaultPrompt = "a meme-worthy background";
-          } else if (parsedCommand.overlayMode === "mantleify") {
-            defaultPrompt = "a digital landscape with mountains";
-          } else if (parsedCommand.overlayMode === "ghiblify") {
-            defaultPrompt = "a serene natural landscape";
-          }
+          const defaultPrompt =
+            DEFAULT_OVERLAY_PROMPTS[parsedCommand.overlayMode] ||
+            "a simple background";
 
           parsedCommand.prompt = defaultPrompt;
           logger.info(
@@ -252,27 +196,17 @@ export class ImageService {
       //   status: "processing",
       // };
 
-      // Validate overlay mode
+      // Validate overlay mode — "wowowify" is the default/no-overlay mode, skip validation
       if (
         parsedCommand.overlayMode &&
-        parsedCommand.overlayMode !== "degenify" &&
-        parsedCommand.overlayMode !== "higherify" &&
-        parsedCommand.overlayMode !== "scrollify" &&
-        parsedCommand.overlayMode !== "lensify" &&
-        parsedCommand.overlayMode !== "higherise" &&
-        parsedCommand.overlayMode !== "dickbuttify" &&
-        parsedCommand.overlayMode !== "nikefy" &&
-        parsedCommand.overlayMode !== "nounify" &&
-        parsedCommand.overlayMode !== "baseify" &&
-        parsedCommand.overlayMode !== "clankerify" &&
-        parsedCommand.overlayMode !== "mantleify" &&
-        parsedCommand.overlayMode !== "ghiblify"
+        parsedCommand.overlayMode !== "wowowify" &&
+        !OVERLAY_KEYWORDS.includes(parsedCommand.overlayMode)
       ) {
         logger.warn("Invalid overlay mode", {
           overlayMode: parsedCommand.overlayMode,
         });
         throw new Error(
-          `Invalid overlay mode: ${parsedCommand.overlayMode}. Supported modes are: degenify, higherify, scrollify, lensify, higherise, dickbuttify, nikefy, nounify, baseify, clankerify, mantleify, ghiblify.`
+          `Invalid overlay mode: ${parsedCommand.overlayMode}. Supported modes are: ${OVERLAY_KEYWORDS.join(", ")}.`
         );
       }
 
@@ -542,10 +476,7 @@ export class ImageService {
             overlayMode: parsedCommand.overlayMode,
           });
 
-          const overlayUrl =
-            OVERLAY_URLS[
-              parsedCommand.overlayMode as keyof typeof OVERLAY_URLS
-            ];
+          const overlayUrl = OVERLAY_URLS[parsedCommand.overlayMode];
           if (!overlayUrl) {
             throw new Error(
               `Unsupported overlay mode: ${parsedCommand.overlayMode}`

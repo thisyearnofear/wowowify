@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { incrementTotalRequests, incrementFailedRequests } from "@/lib/metrics";
 import { getRateLimitInfo } from "@/lib/rate-limiter";
 import { ensureFontsAreRegistered } from "@/lib/image-processor";
-import { ServiceFactory, InterfaceType } from "@/lib/services/service-factory";
+import { getImageService, InterfaceType } from "@/lib/services";
 
 // Mark the route as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";
@@ -149,7 +149,7 @@ export async function POST(request: Request): Promise<Response> {
       interfaceType = "telegram";
     }
 
-    const imageService = ServiceFactory.getServiceForInterface(interfaceType);
+    const imageService = getImageService(interfaceType);
 
     // Parse the command if not provided explicitly
     let parsedCommand: ParsedCommand;

@@ -1,5 +1,5 @@
 import React from "react";
-import { OverlayMode } from "../ImageOverlay";
+import { OverlayMode } from "@/lib/config/overlays";
 
 interface AdjustStageProps {
   mode: OverlayMode;
@@ -99,7 +99,8 @@ export const AdjustStage = ({
         </button>
         <button
           onClick={onBack}
-          className="flex-1 p-2 md:px-6 md:py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
+          className="flex-1 p-2 md:px-6 md:py-3 surface rounded-lg transition-all flex items-center justify-center gap-2 hover:shadow-md"
+          style={{ color: "var(--color-text-secondary)" }}
         >
           <span className="hidden md:inline">Back</span>
           <span>←</span>

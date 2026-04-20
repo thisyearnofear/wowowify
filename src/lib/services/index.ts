@@ -1,4 +1,5 @@
 import { ImageService } from "./image-service";
-import { ServiceFactory } from "./service-factory";
+import { getImageService } from "./service-factory";
+export type { InterfaceType } from "./service-factory";
 
-export { ImageService, ServiceFactory };
+export { ImageService, getImageService };

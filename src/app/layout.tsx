@@ -43,6 +43,12 @@ export default function RootLayout({
         <meta name="theme-color" content="#131313" />
         <link rel="icon" href="/wowwowowify.png" />
         <link rel="manifest" href="/.well-known/farcaster.json" />
+        {/* Prevent dark mode FOUC by setting class before React hydrates */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||((!t||t==='system')&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+          }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

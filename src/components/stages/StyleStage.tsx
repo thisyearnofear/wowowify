@@ -1,5 +1,5 @@
 import React from "react";
-import { OverlayMode } from "../ImageOverlay";
+import { OverlayMode } from "@/lib/config/overlays";
 
 interface StyleStageProps {
   mode: OverlayMode;
@@ -23,14 +23,27 @@ export const StyleStage = ({
 }: StyleStageProps) => {
   return (
     <div className="animate-fadeIn">
-      <h3 className="text-lg font-medium text-gray-900 mb-4 text-center">
+      <h3
+        className="text-lg font-medium mb-4 text-center"
+        style={{ color: "var(--color-text)" }}
+      >
         Choose Style or Transform
       </h3>
 
       <div className="mb-6">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Overlays</h4>
+        <h4
+          className="text-sm font-medium mb-2"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
+          Overlays
+        </h4>
         <div className="mb-4">
-          <h5 className="text-xs text-gray-600 mb-2">Background Color</h5>
+          <h5
+            className="text-xs mb-2"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            Background Color
+          </h5>
           <div className="grid grid-cols-4 gap-2 mb-3">
             <button
               onClick={() => updateControl("overlayColor", "#000000")}
@@ -144,7 +157,10 @@ export const StyleStage = ({
       </div>
 
       <div className="mb-6">
-        <h4 className="text-sm font-medium text-gray-700 text-center mb-2">
+        <h4
+          className="text-sm font-medium text-center mb-2"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
           AI Transformations
         </h4>
         <div className="flex justify-center">
@@ -167,7 +183,8 @@ export const StyleStage = ({
       <div className="mt-6 text-center">
         <button
           onClick={onStartOver}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-2 mx-auto text-sm"
+          className="surface px-4 py-2 rounded-lg transition-all flex items-center justify-center gap-2 mx-auto text-sm hover:shadow-md"
+          style={{ color: "var(--color-text-secondary)" }}
         >
           <span>←</span>
           <span>Start Over</span>

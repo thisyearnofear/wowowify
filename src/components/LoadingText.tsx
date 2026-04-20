@@ -1,23 +1,22 @@
 export const LoadingText = () => {
   const colors = [
-    "text-violet-500",
-    "text-emerald-500",
-    "text-pink-500",
-    "text-blue-500",
-    "text-yellow-500",
+    "var(--color-degenify)",
+    "var(--color-higherify)",
+    "var(--color-scrollify)",
+    "var(--color-wowowify)",
+    "var(--color-degenify)",
   ];
 
   return (
-    <div className="flex items-center justify-center">
+    <div className="flex items-center justify-center gap-0.5">
       {Array.from("wowow").map((letter, i) => (
         <span
           key={i}
-          className={`inline-block transition-transform ${
-            colors[i % colors.length]
-          }`}
+          className="inline-block text-lg font-bold"
           style={{
-            animationDelay: `${i * 0.1}s`,
-            animation: "bounce 0.5s infinite",
+            color: colors[i % colors.length],
+            animationDelay: `${i * 0.12}s`,
+            animation: "bounce 0.6s ease-in-out infinite",
           }}
         >
           {letter}
