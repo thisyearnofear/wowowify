@@ -127,6 +127,48 @@ export const OVERLAY_COLORS: Record<
     hover: "hover:bg-pink-100",
     active: "bg-pink-100 text-pink-800",
   },
+  lensify: {
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+    hover: "hover:bg-cyan-100",
+    active: "bg-cyan-100 text-cyan-800",
+  },
+  higherise: {
+    bg: "bg-green-50",
+    text: "text-green-700",
+    hover: "hover:bg-green-100",
+    active: "bg-green-100 text-green-800",
+  },
+  dickbuttify: {
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    hover: "hover:bg-orange-100",
+    active: "bg-orange-100 text-orange-800",
+  },
+  nikefy: {
+    bg: "bg-red-50",
+    text: "text-red-700",
+    hover: "hover:bg-red-100",
+    active: "bg-red-100 text-red-800",
+  },
+  nounify: {
+    bg: "bg-yellow-50",
+    text: "text-yellow-700",
+    hover: "hover:bg-yellow-100",
+    active: "bg-yellow-100 text-yellow-800",
+  },
+  clankerify: {
+    bg: "bg-indigo-50",
+    text: "text-indigo-700",
+    hover: "hover:bg-indigo-100",
+    active: "bg-indigo-100 text-indigo-800",
+  },
+  mantleify: {
+    bg: "bg-fuchsia-50",
+    text: "text-fuchsia-700",
+    hover: "hover:bg-fuchsia-100",
+    active: "bg-fuchsia-100 text-fuchsia-800",
+  },
   wowowify: {
     bg: "bg-gray-50",
     text: "text-gray-700",

@@ -1,5 +1,32 @@
 import React from "react";
-import { OverlayMode } from "@/lib/config/overlays";
+import { OverlayMode, OVERLAY_COLORS } from "@/lib/config/overlays";
+
+/** Reusable overlay mode button with color theming from shared config */
+function OverlayButton({
+  mode: currentMode,
+  onClick,
+  name,
+  icon,
+}: {
+  mode: OverlayMode;
+  onClick: (mode: OverlayMode) => void;
+  name: OverlayMode;
+  icon: string;
+}) {
+  const colors = OVERLAY_COLORS[name] || OVERLAY_COLORS.wowowify;
+  const isActive = currentMode === name;
+  return (
+    <button
+      data-theme={name}
+      onClick={() => onClick(name)}
+      className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
+        ${isActive ? colors.active : `${colors.bg} ${colors.text} ${colors.hover}`}`}
+    >
+      <span className="text-lg">{icon}</span>
+      <span className="text-xs font-medium capitalize">{name}</span>
+    </button>
+  );
+}
 
 interface StyleStageProps {
   mode: OverlayMode;
@@ -100,59 +127,18 @@ export const StyleStage = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            data-theme="degenify"
-            onClick={() => loadPresetOverlay("degenify")}
-            className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
-              ${
-                mode === "degenify"
-                  ? "bg-violet-100 text-violet-800"
-                  : "bg-violet-50 text-violet-700 hover:bg-violet-100"
-              }`}
-          >
-            <span className="text-lg">🎩</span>
-            <span className="text-xs font-medium">Degenify</span>
-          </button>
-          <button
-            data-theme="higherify"
-            onClick={() => loadPresetOverlay("higherify")}
-            className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
-              ${
-                mode === "higherify"
-                  ? "bg-emerald-100 text-emerald-800"
-                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-              }`}
-          >
-            <span className="text-lg">↑</span>
-            <span className="text-xs font-medium">Higherify</span>
-          </button>
-          <button
-            data-theme="scrollify"
-            onClick={() => loadPresetOverlay("scrollify")}
-            className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
-              ${
-                mode === "scrollify"
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-              }`}
-          >
-            <span className="text-lg">📜</span>
-            <span className="text-xs font-medium">Scrollify</span>
-          </button>
-          <button
-            data-theme="baseify"
-            onClick={() => loadPresetOverlay("baseify")}
-            className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
-              ${
-                mode === "baseify"
-                  ? "bg-blue-100 text-blue-800"
-                  : "bg-blue-50 text-blue-700 hover:bg-blue-100"
-              }`}
-          >
-            <span className="text-lg">🔵</span>
-            <span className="text-xs font-medium">Baseify</span>
-          </button>
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="degenify" icon="🎩" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="higherify" icon="↑" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="scrollify" icon="📜" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="baseify" icon="🔵" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="lensify" icon="📷" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="higherise" icon="🏔️" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="dickbuttify" icon="😏" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="nikefy" icon="✔️" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="nounify" icon="👓" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="clankerify" icon="⚙️" />
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="mantleify" icon="🌋" />
         </div>
       </div>
 
@@ -164,19 +150,7 @@ export const StyleStage = ({
           AI Transformations
         </h4>
         <div className="flex justify-center">
-          <button
-            data-theme="ghiblify"
-            onClick={() => loadPresetOverlay("ghiblify")}
-            className={`w-32 p-3 rounded-lg text-center transition-all flex flex-col items-center gap-1
-              ${
-                mode === "ghiblify"
-                  ? "bg-pink-100 text-pink-800"
-                  : "bg-pink-50 text-pink-700 hover:bg-pink-100"
-              }`}
-          >
-            <span className="text-lg">✨</span>
-            <span className="text-xs font-medium">Ghiblify</span>
-          </button>
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="ghiblify" icon="✨" />
         </div>
       </div>
 

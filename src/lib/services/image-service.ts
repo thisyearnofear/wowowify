@@ -18,10 +18,12 @@ import {
   OVERLAY_KEYWORDS,
 } from "@/lib/config/overlays";
 
-// OVERLAY_URLS now lives in @/lib/config/overlays — single source of truth
-
 // Timeout for image processing
 const TIMEOUT_MS = 30000;
+
+// Venice API configuration
+const VENICE_API_URL = "https://api.venice.ai/api/v1/image/generate";
+const VENICE_MODEL = "stable-diffusion-3.5";
 
 /**
  * Core image service that can be used by all API endpoints
@@ -35,10 +37,8 @@ export class ImageService {
     interfaceType: InterfaceType = "default",
     parentImageUrl?: string
   ): ParsedCommand {
-    // Parse the command using the appropriate parser
     const parsedCommand = parseCommand(command, interfaceType);
 
-    // Log the parsed command for debugging
     logger.info("Initial parsed command", {
       action: parsedCommand.action,
       overlayMode: parsedCommand.overlayMode,
@@ -49,114 +49,12 @@ export class ImageService {
       interfaceType,
     });
 
-    // If parentImageUrl is provided, use it as the baseImageUrl
     if (parentImageUrl) {
-      logger.info("Using parent image URL", { parentImageUrl });
-      parsedCommand.baseImageUrl = parentImageUrl;
-
-      // Only force overlay mode if the command parser hasn't already made a decision
-      // This allows explicit "generate:" commands to override the parent image
-      if (
-        !parsedCommand.useParentImage &&
-        parsedCommand.action !== "generate"
-      ) {
-        // If the command doesn't have a descriptive prompt beyond the overlay keyword,
-        // assume it's meant to apply to the parent image
-        const hasDescriptivePrompt =
-          parsedCommand.prompt && parsedCommand.prompt.length > 10;
-
-        if (!hasDescriptivePrompt && parsedCommand.overlayMode) {
-          // If there's just an overlay mode without a descriptive prompt, apply to parent
-          parsedCommand.useParentImage = true;
-          parsedCommand.action = "overlay";
-          logger.info(
-            "No descriptive prompt with overlay mode, applying to parent image",
-            {
-              overlayMode: parsedCommand.overlayMode,
-            }
-          );
-        } else if (!parsedCommand.overlayMode && !parsedCommand.text) {
-          // If there's no overlay mode and no text, but we have a parent image,
-          // default to degenify overlay
-          parsedCommand.overlayMode = "degenify"; // Default to degenify if not specified
-          parsedCommand.useParentImage = true;
-          parsedCommand.action = "overlay";
-          logger.info(
-            "No overlay mode specified with parent image, defaulting to degenify"
-          );
-        }
-      }
+      this.applyParentImageContext(parsedCommand, parentImageUrl);
     } else {
-      // No parent image URL provided
-
-      // If we have an overlay mode but no action specified, determine if this should be
-      // a generation or overlay command
-      if (
-        parsedCommand.overlayMode &&
-        parsedCommand.action !== "generate" &&
-        parsedCommand.action !== "overlay"
-      ) {
-        // Check if there's a descriptive prompt
-        const hasDescriptivePrompt =
-          parsedCommand.prompt && parsedCommand.prompt.length > 10;
-
-        if (hasDescriptivePrompt) {
-          // If there's a descriptive prompt, this is likely a generation command with overlay
-          parsedCommand.action = "generate";
-          logger.info(
-            "Setting action to generate based on descriptive prompt with overlay",
-            {
-              overlayMode: parsedCommand.overlayMode,
-              prompt: parsedCommand.prompt,
-            }
-          );
-        } else {
-          // If there's no descriptive prompt, this is likely an overlay command
-          // But since we don't have a parent image, we'll need to generate a default image
-          parsedCommand.action = "generate";
-
-          // Create a default prompt based on the overlay type
-          const defaultPrompt =
-            DEFAULT_OVERLAY_PROMPTS[parsedCommand.overlayMode] ||
-            "a simple background";
-
-          parsedCommand.prompt = defaultPrompt;
-          logger.info(
-            "Setting action to generate with default prompt for overlay",
-            {
-              overlayMode: parsedCommand.overlayMode,
-              defaultPrompt,
-            }
-          );
-        }
-      }
-
-      // If we have an explicit generation command but no prompt, extract it from the command
-      if (
-        parsedCommand.action === "generate" &&
-        (!parsedCommand.prompt || parsedCommand.prompt.length < 3)
-      ) {
-        // Try to extract a prompt from the command
-        const promptMatch = command.match(
-          /^(?:generate|create|make|draw)\s+(?:a|an)?\s*(?:image|picture|photo)?\s*(?:of|with)?\s*(.*)/i
-        );
-        if (promptMatch && promptMatch[1]) {
-          parsedCommand.prompt = promptMatch[1].trim();
-        } else {
-          // Fallback: use the whole command as prompt after removing generation keywords
-          parsedCommand.prompt = command
-            .replace(/^(generate|create|make|draw)\s+/i, "")
-            .replace(/^(a|an)\s+(image|picture|photo)\s+of\s+/i, "")
-            .trim();
-        }
-
-        logger.info("Extracted prompt for generation command", {
-          prompt: parsedCommand.prompt,
-        });
-      }
+      this.resolveActionWithoutParent(parsedCommand, command);
     }
 
-    // Final validation and logging
     logger.info("Final parsed command", {
       action: parsedCommand.action,
       overlayMode: parsedCommand.overlayMode,
@@ -180,35 +78,14 @@ export class ImageService {
     walletAddressForOverlay?: string,
     isFarcaster: boolean = false
   ): Promise<AgentResponse> {
-    // Generate a unique ID for this request
     const requestId = uuidv4();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
-      // Ensure fonts are registered before processing
       await ensureFontsAreRegistered();
 
-      // Initialize the response
-      // Commented out as it's not used
-      // const response: AgentResponse = {
-      //   id: requestId,
-      //   status: "processing",
-      // };
-
-      // Validate overlay mode — "wowowify" is the default/no-overlay mode, skip validation
-      if (
-        parsedCommand.overlayMode &&
-        parsedCommand.overlayMode !== "wowowify" &&
-        !OVERLAY_KEYWORDS.includes(parsedCommand.overlayMode)
-      ) {
-        logger.warn("Invalid overlay mode", {
-          overlayMode: parsedCommand.overlayMode,
-        });
-        throw new Error(
-          `Invalid overlay mode: ${parsedCommand.overlayMode}. Supported modes are: ${OVERLAY_KEYWORDS.join(", ")}.`
-        );
-      }
+      this.validateOverlayMode(parsedCommand.overlayMode);
 
       logger.info("Processing command", {
         requestId,
@@ -218,596 +95,41 @@ export class ImageService {
         overlayMode: parsedCommand.overlayMode,
       });
 
-      // If this is a ghiblify request, handle it differently
+      // Ghiblify has its own processing pipeline
       if (parsedCommand.overlayMode === "ghiblify") {
-        if (!parsedCommand.baseImageUrl) {
-          throw new Error("Base image URL is required for ghiblify mode");
-        }
-
-        logger.info("Processing ghiblify request", {
-          baseImageUrl: parsedCommand.baseImageUrl,
-        });
-
-        const result = await ghibliService.processImage(
-          parsedCommand.baseImageUrl,
-          walletAddressForOverlay
-        );
-
-        // Generate a unique ID for this result
-        const resultId = uuidv4();
-
-        // Store the result URL in image history
-        await storeImageUrl(
-          resultId,
-          result.resultUrl,
-          undefined,
-          result.groveUrl
-        );
-
-        return {
-          id: resultId,
-          status: "completed",
-          resultUrl: result.resultUrl,
-          groveUrl: result.groveUrl,
-        };
+        return await this.handleGhiblify(parsedCommand, walletAddressForOverlay);
       }
 
-      // Step 1: Generate or get base image
-      let baseImageBuffer: Buffer;
-      if (parsedCommand.baseImageUrl) {
-        // Download image from URL
-        try {
-          logger.info("Downloading image from URL", {
-            url: parsedCommand.baseImageUrl.substring(0, 100), // Log truncated URL for privacy
-          });
+      // Step 1: Acquire base image
+      const baseImageBuffer = await this.acquireBaseImage(
+        parsedCommand,
+        controller.signal
+      );
 
-          // Special handling for imagedelivery.net URLs (Farcaster images)
-          const imageUrl = parsedCommand.baseImageUrl;
-          const isFarcasterImage = imageUrl.includes("imagedelivery.net");
-
-          // For Farcaster images, ensure we're requesting the original size
-          const finalImageUrl =
-            isFarcasterImage && !imageUrl.includes("/original")
-              ? `${imageUrl.split("?")[0]}/original`
-              : imageUrl;
-
-          if (finalImageUrl !== imageUrl) {
-            logger.info("Modified image URL to request original size", {
-              originalUrl: imageUrl.substring(0, 100),
-              modifiedUrl: finalImageUrl.substring(0, 100),
-            });
-          }
-
-          const response = await fetch(finalImageUrl, {
-            signal: controller.signal,
-            headers: {
-              // Add headers that might be needed for certain image hosts
-              "User-Agent": "Mozilla/5.0 (compatible; WOWOWIFYAgent/1.0)",
-              Accept: "image/*, */*",
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error(
-              `Failed to download image: ${response.status} ${response.statusText}`
-            );
-          }
-
-          const contentType = response.headers.get("content-type");
-          if (contentType && !contentType.includes("image")) {
-            logger.warn("URL did not return an image content type", {
-              contentType,
-              url: finalImageUrl.substring(0, 100),
-            });
-            // Continue anyway as some servers might not set the correct content type
-          }
-
-          const arrayBuffer = await response.arrayBuffer();
-          baseImageBuffer = Buffer.from(arrayBuffer);
-
-          if (baseImageBuffer.length < 100) {
-            throw new Error("Downloaded image is too small or invalid");
-          }
-
-          logger.info("Successfully downloaded image", {
-            size: baseImageBuffer.length,
-            url: finalImageUrl.substring(0, 100),
-          });
-        } catch (error) {
-          logger.error("Error downloading image", {
-            error: error instanceof Error ? error.message : "Unknown error",
-            url: parsedCommand.baseImageUrl.substring(0, 100),
-          });
-          throw new Error(
-            `Failed to download base image: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`
-          );
-        }
-      } else if (parsedCommand.prompt) {
-        // wowowify from prompt
-        try {
-          // Validate API configuration
-          if (!process.env.VENICE_API_KEY) {
-            logger.error("VENICE_API_KEY is not configured");
-            throw new Error("Server configuration error");
-          }
-
-          logger.info("Generating image with Venice API", {
-            prompt: parsedCommand.prompt,
-            model: "stable-diffusion-3.5",
-          });
-
-          const veniceResponse = await fetch(
-            "https://api.venice.ai/api/v1/image/generate",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.VENICE_API_KEY}`,
-              },
-              body: JSON.stringify({
-                prompt: parsedCommand.prompt,
-                model: "stable-diffusion-3.5",
-                hide_watermark: true,
-                width: 512,
-                height: 512,
-              }),
-              signal: controller.signal,
-            }
-          );
-
-          if (!veniceResponse.ok) {
-            const text = await veniceResponse.text();
-            logger.error("Venice API error", {
-              status: veniceResponse.status,
-              statusText: veniceResponse.statusText,
-              responseText: text,
-            });
-            throw new Error(`Failed to wowowify: ${veniceResponse.statusText}`);
-          }
-
-          const data = await veniceResponse.json();
-          if (!data.images?.[0]) {
-            throw new Error("No image generated");
-          }
-
-          baseImageBuffer = Buffer.from(data.images[0], "base64");
-        } catch (error) {
-          logger.error("Error generating image", {
-            error: error instanceof Error ? error.message : "Unknown error",
-            prompt: parsedCommand.prompt,
-          });
-          throw error;
-        }
-      } else if (parsedCommand.overlayMode) {
-        // If an overlay is requested but no prompt or base image is provided,
-        // generate a default image based on the overlay type
-        try {
-          // Validate API configuration
-          if (!process.env.VENICE_API_KEY) {
-            logger.error("VENICE_API_KEY is not configured");
-            throw new Error("Server configuration error");
-          }
-
-          // Create a default prompt based on the overlay type
-          let defaultPrompt = "a simple background";
-          if (parsedCommand.overlayMode === "higherify") {
-            defaultPrompt = "a mountain landscape with clear sky";
-          } else if (parsedCommand.overlayMode === "degenify") {
-            defaultPrompt = "a colorful abstract pattern";
-          } else if (parsedCommand.overlayMode === "scrollify") {
-            defaultPrompt = "a minimalist tech background";
-          } else if (parsedCommand.overlayMode === "lensify") {
-            defaultPrompt = "a professional photography background";
-          }
-
-          logger.info("Generating default image for overlay", {
-            overlayMode: parsedCommand.overlayMode,
-            defaultPrompt,
-          });
-
-          const veniceResponse = await fetch(
-            "https://api.venice.ai/api/v1/image/generate",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.VENICE_API_KEY}`,
-              },
-              body: JSON.stringify({
-                prompt: defaultPrompt,
-                model: "stable-diffusion-3.5",
-                hide_watermark: true,
-                width: 512,
-                height: 512,
-              }),
-              signal: controller.signal,
-            }
-          );
-
-          if (!veniceResponse.ok) {
-            throw new Error(`Venice API error: ${veniceResponse.statusText}`);
-          }
-
-          const veniceData = await veniceResponse.json();
-          const imageBase64 = veniceData.images[0];
-          baseImageBuffer = Buffer.from(imageBase64, "base64");
-        } catch (error) {
-          logger.error("Error generating default image", {
-            error: error instanceof Error ? error.message : "Unknown error",
-            overlayMode: parsedCommand.overlayMode,
-          });
-          throw new Error("Failed to generate default image for overlay");
-        }
-      } else {
-        throw new Error("No base image URL or prompt provided");
-      }
-
-      // Step 2: Process the image with overlay
+      // Step 2: Compose overlay + text on canvas
       const resultId = uuidv4();
       const previewId = uuidv4();
 
       try {
-        // Load base image
-        const baseImage = await loadImage(baseImageBuffer);
-
-        // Create canvas with base image dimensions
-        const canvas = createCanvas(baseImage.width, baseImage.height);
-        const ctx = canvas.getContext("2d");
-
-        // Draw base image
-        ctx.drawImage(baseImage, 0, 0);
-
-        // Apply color overlay if specified
-        if (
-          parsedCommand.controls?.overlayAlpha &&
-          parsedCommand.controls.overlayAlpha > 0
-        ) {
-          ctx.fillStyle = parsedCommand.controls.overlayColor || "#000000";
-          ctx.globalAlpha = parsedCommand.controls.overlayAlpha;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.globalAlpha = 1;
-        }
-
-        // Load and apply overlay image if mode is specified
-        if (parsedCommand.overlayMode) {
-          logger.info("Applying overlay", {
-            overlayMode: parsedCommand.overlayMode,
-          });
-
-          const overlayUrl = OVERLAY_URLS[parsedCommand.overlayMode];
-          if (!overlayUrl) {
-            throw new Error(
-              `Unsupported overlay mode: ${parsedCommand.overlayMode}`
-            );
-          }
-
-          // Handle relative URLs for local development
-          const fullOverlayUrl = overlayUrl.startsWith("/")
-            ? `${baseUrl}${overlayUrl}`
-            : overlayUrl;
-
-          logger.info("Fetching overlay", { url: fullOverlayUrl });
-
-          try {
-            const overlayResponse = await fetch(fullOverlayUrl, {
-              signal: controller.signal,
-            });
-
-            if (!overlayResponse.ok) {
-              throw new Error(
-                `Failed to download overlay: ${overlayResponse.statusText}`
-              );
-            }
-
-            const overlayArrayBuffer = await overlayResponse.arrayBuffer();
-            const overlayBuffer = Buffer.from(overlayArrayBuffer);
-            const overlayImage = await loadImage(overlayBuffer);
-
-            // Calculate scale and position
-            const scale = parsedCommand.controls?.scale || 1;
-            const scaledWidth = overlayImage.width * scale;
-            const scaledHeight = overlayImage.height * scale;
-
-            // Calculate position (centered by default)
-            const x =
-              (canvas.width - scaledWidth) / 2 +
-              (parsedCommand.controls?.x || 0);
-            const y =
-              (canvas.height - scaledHeight) / 2 +
-              (parsedCommand.controls?.y || 0);
-
-            // Draw overlay
-            ctx.drawImage(overlayImage, x, y, scaledWidth, scaledHeight);
-            logger.info("Overlay applied successfully", {
-              overlayMode: parsedCommand.overlayMode,
-              scale,
-              x,
-              y,
-            });
-          } catch (error) {
-            logger.error("Error applying overlay", {
-              error: error instanceof Error ? error.message : "Unknown error",
-              overlayMode: parsedCommand.overlayMode,
-            });
-            // Continue without the overlay rather than failing completely
-          }
-        }
-
-        // Get result image buffer
-        let resultBuffer: Buffer;
-        resultBuffer = canvas.toBuffer("image/png");
-
-        // Create preview (smaller version)
-        const previewSize = 300;
-        const previewCanvas = createCanvas(
-          previewSize,
-          previewSize * (baseImage.height / baseImage.width)
-        );
-        const previewCtx = previewCanvas.getContext("2d");
-        previewCtx.drawImage(
-          canvas,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
-          0,
-          0,
-          previewCanvas.width,
-          previewCanvas.height
+        const { resultBuffer, previewBuffer } = await this.composeImage(
+          parsedCommand,
+          baseImageBuffer,
+          baseUrl,
+          controller.signal
         );
 
-        // Get preview buffer
-        let previewBuffer = previewCanvas.toBuffer("image/png");
-
-        // Add text to the image if specified
-        if (parsedCommand.text?.content) {
-          logger.info("Adding text to image", {
-            text: parsedCommand.text.content,
-            position: parsedCommand.text.position,
-            fontSize: parsedCommand.text.fontSize,
-            color: parsedCommand.text.color,
-            style: parsedCommand.text.style,
-          });
-
-          // Map text style to font family
-          let fontFamily = "Roboto, sans-serif";
-          let fontWeight = "normal";
-          const fontSize = parsedCommand.text.fontSize || 48;
-          const color = parsedCommand.text.color || "white";
-          const strokeColor: string | undefined = undefined;
-          const strokeWidth = 0;
-          const shadow:
-            | {
-                color: string;
-                offsetX: number;
-                offsetY: number;
-                blur: number;
-              }
-            | undefined = undefined;
-
-          // Position mapping
-          let x: number | "center" | "left" | "right" = "center";
-          let y: number | "center" | "top" | "bottom" = "bottom";
-
-          // Map position
-          if (parsedCommand.text.position) {
-            const pos = parsedCommand.text.position.toLowerCase();
-            if (
-              pos === "top" ||
-              pos === "bottom" ||
-              pos === "center" ||
-              pos === "left" ||
-              pos === "right" ||
-              pos === "top-left" ||
-              pos === "top-right" ||
-              pos === "bottom-left" ||
-              pos === "bottom-right"
-            ) {
-              // Handle compound positions
-              if (pos === "top-left") {
-                x = "left";
-                y = "top";
-              } else if (pos === "top-right") {
-                x = "right";
-                y = "top";
-              } else if (pos === "bottom-left") {
-                x = "left";
-                y = "bottom";
-              } else if (pos === "bottom-right") {
-                x = "right";
-                y = "bottom";
-              } else if (pos === "left" || pos === "right") {
-                x = pos;
-                y = "center";
-              } else {
-                y = pos as "top" | "bottom" | "center";
-              }
-            }
-          }
-
-          // Map text style to font
-          if (parsedCommand.text.style) {
-            const style = parsedCommand.text.style.toLowerCase();
-            switch (style) {
-              case "serif":
-                fontFamily = "serif";
-                break;
-              case "monospace":
-              case "mono":
-                fontFamily = "RobotoMono, monospace";
-                break;
-              case "handwriting":
-              case "script":
-                // Fallback to sans-serif if handwriting font not available
-                fontFamily = "Roboto, sans-serif";
-                fontWeight = "normal";
-                break;
-              case "thin":
-                fontWeight = "normal";
-                break;
-              case "bold":
-                fontWeight = "bold";
-                break;
-              default:
-                // Keep default Roboto sans-serif
-                break;
-            }
-          }
-
-          logger.info("Using font settings", {
-            fontFamily,
-            fontWeight,
-            fontSize,
-            textStyle: parsedCommand.text.style,
-          });
-
-          // Add text to the image
-          resultBuffer = await addTextToImage(
-            resultBuffer,
-            parsedCommand.text.content,
-            {
-              x,
-              y,
-              fontSize,
-              fontFamily,
-              fontWeight,
-              color,
-              strokeColor,
-              strokeWidth,
-              shadow,
-              backgroundColor: parsedCommand.text.backgroundColor,
-              padding: 10,
-              maxWidth: 800,
-              lineHeight: 1.2,
-              align: "center",
-            }
-          );
-
-          // Update the preview with text as well
-          previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-          const imageWithText = await loadImage(resultBuffer);
-          previewCtx.drawImage(
-            imageWithText,
-            0,
-            0,
-            imageWithText.width,
-            imageWithText.height,
-            0,
-            0,
-            previewCanvas.width,
-            previewCanvas.height
-          );
-          previewBuffer = previewCanvas.toBuffer("image/png");
-        }
-
-        // Store the image in memory
-        storeImage(resultId, resultBuffer, "image/png");
-        storeImage(previewId, previewBuffer, "image/png");
-
-        // Create result URLs
-        const resultUrl = `${baseUrl}/api/image?id=${resultId}`;
-        const previewUrl = `${baseUrl}/api/image?id=${previewId}`;
-
-        // Store all images in Grove, not just lensify
-        let groveUri, groveUrl;
-        if (resultBuffer) {
-          logger.info(
-            `Storing ${parsedCommand.overlayMode || "generated"} image in Grove`
-          );
-          try {
-            const fileName = `${
-              parsedCommand.overlayMode || "generated"
-            }-${resultId}.png`;
-
-            // Check if this request is coming from Farcaster
-            if (isFarcaster) {
-              logger.info(
-                "Request is from Farcaster, prioritizing Grove storage"
-              );
-            }
-
-            // Always attempt Grove storage, even without a wallet address
-            // This is especially important for Farcaster integration
-            const groveResult = await uploadToGrove(
-              resultBuffer,
-              fileName,
-              walletAddressForOverlay // Pass the wallet address for ACL if available
-            );
-
-            // Only set the Grove URI and URL if they're not empty
-            if (groveResult.uri && groveResult.gatewayUrl) {
-              groveUri = groveResult.uri;
-              groveUrl = groveResult.gatewayUrl;
-              logger.info("Successfully stored image in Grove", {
-                groveUri,
-                groveUrl,
-                walletAddress: walletAddressForOverlay || "none",
-                isFarcaster: isFarcaster || false,
-              });
-            } else {
-              logger.warn("Grove storage returned empty URI or URL", {
-                uri: groveResult.uri,
-                gatewayUrl: groveResult.gatewayUrl,
-                walletAddress: walletAddressForOverlay || "none",
-                isFarcaster: isFarcaster || false,
-              });
-
-              // If this is a Farcaster request and Grove storage failed, try again
-              if (isFarcaster) {
-                logger.info("Retrying Grove storage for Farcaster request");
-                try {
-                  // Try again with a different file name
-                  const retryFileName = `retry-${
-                    parsedCommand.overlayMode || "generated"
-                  }-${resultId}.png`;
-
-                  const retryResult = await uploadToGrove(
-                    resultBuffer,
-                    retryFileName
-                  );
-
-                  if (retryResult.uri && retryResult.gatewayUrl) {
-                    groveUri = retryResult.uri;
-                    groveUrl = retryResult.gatewayUrl;
-                    logger.info("Successfully stored image in Grove on retry", {
-                      groveUri,
-                      groveUrl,
-                    });
-                  }
-                } catch (retryError) {
-                  logger.error("Failed to store image in Grove on retry", {
-                    error:
-                      retryError instanceof Error
-                        ? retryError.message
-                        : String(retryError),
-                  });
-                }
-              }
-            }
-          } catch (error) {
-            logger.error("Failed to store image in Grove", {
-              error: error instanceof Error ? error.message : String(error),
-              walletAddress: walletAddressForOverlay || "none",
-            });
-          }
-        }
-
-        // Store the image URL in history
-        await storeImageUrl(requestId, resultUrl, groveUri, groveUrl);
-
-        // Return the response
-        const response: AgentResponse = {
-          id: requestId,
-          status: "completed",
-          resultUrl,
-          previewUrl,
-          groveUri,
-          groveUrl,
-        };
-
-        return response;
+        // Step 3: Store in memory + Grove + history
+        return await this.finalizeResult(
+          resultId,
+          previewId,
+          requestId,
+          parsedCommand,
+          resultBuffer,
+          previewBuffer,
+          baseUrl,
+          walletAddressForOverlay,
+          isFarcaster
+        );
       } catch (error) {
         logger.error("Error processing image", {
           error: error instanceof Error ? error.message : "Unknown error",
@@ -829,6 +151,723 @@ export class ImageService {
       };
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  // --- Private helpers ---
+
+  /**
+   * Validate overlay mode is supported
+   */
+  private validateOverlayMode(overlayMode?: string): void {
+    if (
+      overlayMode &&
+      overlayMode !== "wowowify" &&
+      !OVERLAY_KEYWORDS.includes(overlayMode)
+    ) {
+      logger.warn("Invalid overlay mode", { overlayMode });
+      throw new Error(
+        `Invalid overlay mode: ${overlayMode}. Supported modes are: ${OVERLAY_KEYWORDS.join(", ")}.`
+      );
+    }
+  }
+
+  /**
+   * Handle ghiblify AI transformation (separate pipeline)
+   */
+  private async handleGhiblify(
+    parsedCommand: ParsedCommand,
+    walletAddress?: string
+  ): Promise<AgentResponse> {
+    if (!parsedCommand.baseImageUrl) {
+      throw new Error("Base image URL is required for ghiblify mode");
+    }
+
+    logger.info("Processing ghiblify request", {
+      baseImageUrl: parsedCommand.baseImageUrl,
+    });
+
+    const result = await ghibliService.processImage(
+      parsedCommand.baseImageUrl,
+      walletAddress
+    );
+
+    const resultId = uuidv4();
+    await storeImageUrl(resultId, result.resultUrl, undefined, result.groveUrl);
+
+    return {
+      id: resultId,
+      status: "completed",
+      resultUrl: result.resultUrl,
+      groveUrl: result.groveUrl,
+    };
+  }
+
+  /**
+   * Acquire base image: download from URL, generate from prompt, or generate default
+   */
+  private async acquireBaseImage(
+    parsedCommand: ParsedCommand,
+    abortSignal: AbortSignal
+  ): Promise<Buffer> {
+    if (parsedCommand.baseImageUrl) {
+      return this.downloadBaseImage(parsedCommand.baseImageUrl, abortSignal);
+    } else if (parsedCommand.prompt) {
+      return this.generateImageFromPrompt(parsedCommand.prompt, abortSignal);
+    } else if (parsedCommand.overlayMode) {
+      return this.generateDefaultForOverlay(parsedCommand.overlayMode, abortSignal);
+    } else {
+      throw new Error("No base image URL or prompt provided");
+    }
+  }
+
+  /**
+   * Download base image from URL, with Farcaster image handling
+   */
+  private async downloadBaseImage(
+    imageUrl: string,
+    abortSignal: AbortSignal
+  ): Promise<Buffer> {
+    try {
+      logger.info("Downloading image from URL", {
+        url: imageUrl.substring(0, 100),
+      });
+
+      // Special handling for Farcaster images — request original size
+      const isFarcasterImage = imageUrl.includes("imagedelivery.net");
+      const finalImageUrl =
+        isFarcasterImage && !imageUrl.includes("/original")
+          ? `${imageUrl.split("?")[0]}/original`
+          : imageUrl;
+
+      if (finalImageUrl !== imageUrl) {
+        logger.info("Modified image URL to request original size", {
+          originalUrl: imageUrl.substring(0, 100),
+          modifiedUrl: finalImageUrl.substring(0, 100),
+        });
+      }
+
+      const response = await fetch(finalImageUrl, {
+        signal: abortSignal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; WOWOWIFYAgent/1.0)",
+          Accept: "image/*, */*",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to download image: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (contentType && !contentType.includes("image")) {
+        logger.warn("URL did not return an image content type", {
+          contentType,
+          url: finalImageUrl.substring(0, 100),
+        });
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+
+      if (buffer.length < 100) {
+        throw new Error("Downloaded image is too small or invalid");
+      }
+
+      logger.info("Successfully downloaded image", {
+        size: buffer.length,
+        url: finalImageUrl.substring(0, 100),
+      });
+
+      return buffer;
+    } catch (error) {
+      logger.error("Error downloading image", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        url: imageUrl.substring(0, 100),
+      });
+      throw new Error(
+        `Failed to download base image: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
+
+  /**
+   * Generate image from prompt using Venice API
+   */
+  private async generateImageFromPrompt(
+    prompt: string,
+    abortSignal: AbortSignal
+  ): Promise<Buffer> {
+    try {
+      if (!process.env.VENICE_API_KEY) {
+        logger.error("VENICE_API_KEY is not configured");
+        throw new Error("Server configuration error");
+      }
+
+      logger.info("Generating image with Venice API", {
+        prompt,
+        model: VENICE_MODEL,
+      });
+
+      const response = await fetch(VENICE_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.VENICE_API_KEY}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          model: VENICE_MODEL,
+          hide_watermark: true,
+          width: 512,
+          height: 512,
+        }),
+        signal: abortSignal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        logger.error("Venice API error", {
+          status: response.status,
+          statusText: response.statusText,
+          responseText: text,
+        });
+        throw new Error(`Failed to wowowify: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (!data.images?.[0]) {
+        throw new Error("No image generated");
+      }
+
+      return Buffer.from(data.images[0], "base64");
+    } catch (error) {
+      logger.error("Error generating image", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        prompt,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Generate default background image for an overlay mode
+   */
+  private async generateDefaultForOverlay(
+    overlayMode: string,
+    abortSignal: AbortSignal
+  ): Promise<Buffer> {
+    try {
+      if (!process.env.VENICE_API_KEY) {
+        logger.error("VENICE_API_KEY is not configured");
+        throw new Error("Server configuration error");
+      }
+
+      const defaultPrompt =
+        DEFAULT_OVERLAY_PROMPTS[overlayMode] || "a simple background";
+
+      logger.info("Generating default image for overlay", {
+        overlayMode,
+        defaultPrompt,
+      });
+
+      const response = await fetch(VENICE_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.VENICE_API_KEY}`,
+        },
+        body: JSON.stringify({
+          prompt: defaultPrompt,
+          model: VENICE_MODEL,
+          hide_watermark: true,
+          width: 512,
+          height: 512,
+        }),
+        signal: abortSignal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Venice API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return Buffer.from(data.images[0], "base64");
+    } catch (error) {
+      logger.error("Error generating default image", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        overlayMode,
+      });
+      throw new Error("Failed to generate default image for overlay");
+    }
+  }
+
+  /**
+   * Compose overlay + text onto base image, returning result and preview buffers
+   */
+  private async composeImage(
+    parsedCommand: ParsedCommand,
+    baseImageBuffer: Buffer,
+    baseUrl: string,
+    abortSignal: AbortSignal
+  ): Promise<{ resultBuffer: Buffer; previewBuffer: Buffer }> {
+    const baseImage = await loadImage(baseImageBuffer);
+    const canvas = createCanvas(baseImage.width, baseImage.height);
+    const ctx = canvas.getContext("2d");
+
+    // Draw base image
+    ctx.drawImage(baseImage, 0, 0);
+
+    // Apply color overlay if specified
+    if (
+      parsedCommand.controls?.overlayAlpha &&
+      parsedCommand.controls.overlayAlpha > 0
+    ) {
+      ctx.fillStyle = parsedCommand.controls.overlayColor || "#000000";
+      ctx.globalAlpha = parsedCommand.controls.overlayAlpha;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1;
+    }
+
+    // Apply overlay image
+    if (parsedCommand.overlayMode) {
+      await this.applyOverlayToCanvas(
+        ctx,
+        canvas,
+        parsedCommand,
+        baseUrl,
+        abortSignal
+      );
+    }
+
+    let resultBuffer = canvas.toBuffer("image/png");
+
+    // Create preview
+    const previewSize = 300;
+    const previewCanvas = createCanvas(
+      previewSize,
+      previewSize * (baseImage.height / baseImage.width)
+    );
+    const previewCtx = previewCanvas.getContext("2d");
+    previewCtx.drawImage(
+      canvas,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+      0,
+      0,
+      previewCanvas.width,
+      previewCanvas.height
+    );
+    let previewBuffer = previewCanvas.toBuffer("image/png");
+
+    // Add text if specified
+    if (parsedCommand.text?.content) {
+      const textResult = await this.addTextToResult(
+        resultBuffer,
+        previewCanvas,
+        previewCtx,
+        parsedCommand
+      );
+      resultBuffer = textResult.resultBuffer;
+      previewBuffer = textResult.previewBuffer;
+    }
+
+    return { resultBuffer, previewBuffer };
+  }
+
+  /**
+   * Apply overlay image onto canvas
+   */
+  private async applyOverlayToCanvas(
+    ctx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>,
+    canvas: ReturnType<typeof createCanvas>,
+    parsedCommand: ParsedCommand,
+    baseUrl: string,
+    abortSignal: AbortSignal
+  ): Promise<void> {
+    logger.info("Applying overlay", {
+      overlayMode: parsedCommand.overlayMode,
+    });
+
+    const overlayUrl = OVERLAY_URLS[parsedCommand.overlayMode!];
+    if (!overlayUrl) {
+      throw new Error(`Unsupported overlay mode: ${parsedCommand.overlayMode}`);
+    }
+
+    const fullOverlayUrl = overlayUrl.startsWith("/")
+      ? `${baseUrl}${overlayUrl}`
+      : overlayUrl;
+
+    logger.info("Fetching overlay", { url: fullOverlayUrl });
+
+    try {
+      const overlayResponse = await fetch(fullOverlayUrl, {
+        signal: abortSignal,
+      });
+
+      if (!overlayResponse.ok) {
+        throw new Error(
+          `Failed to download overlay: ${overlayResponse.statusText}`
+        );
+      }
+
+      const overlayBuffer = Buffer.from(await overlayResponse.arrayBuffer());
+      const overlayImage = await loadImage(overlayBuffer);
+
+      const scale = parsedCommand.controls?.scale || 1;
+      const scaledWidth = overlayImage.width * scale;
+      const scaledHeight = overlayImage.height * scale;
+      const x =
+        (canvas.width - scaledWidth) / 2 + (parsedCommand.controls?.x || 0);
+      const y =
+        (canvas.height - scaledHeight) / 2 + (parsedCommand.controls?.y || 0);
+
+      ctx.drawImage(overlayImage, x, y, scaledWidth, scaledHeight);
+      logger.info("Overlay applied successfully", {
+        overlayMode: parsedCommand.overlayMode,
+        scale,
+        x,
+        y,
+      });
+    } catch (error) {
+      logger.error("Error applying overlay", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        overlayMode: parsedCommand.overlayMode,
+      });
+      // Continue without the overlay rather than failing completely
+    }
+  }
+
+  /**
+   * Add text overlay to result image and update preview
+   */
+  private async addTextToResult(
+    resultBuffer: Buffer,
+    previewCanvas: ReturnType<typeof createCanvas>,
+    previewCtx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>,
+    parsedCommand: ParsedCommand
+  ): Promise<{ resultBuffer: Buffer; previewBuffer: Buffer }> {
+    logger.info("Adding text to image", {
+      text: parsedCommand.text!.content,
+      position: parsedCommand.text!.position,
+      fontSize: parsedCommand.text!.fontSize,
+      color: parsedCommand.text!.color,
+      style: parsedCommand.text!.style,
+    });
+
+    // Map text style to font family
+    let fontFamily = "Roboto, sans-serif";
+    let fontWeight = "normal";
+    const fontSize = parsedCommand.text!.fontSize || 48;
+    const color = parsedCommand.text!.color || "white";
+
+    // Position mapping
+    let x: number | "center" | "left" | "right" = "center";
+    let y: number | "center" | "top" | "bottom" = "bottom";
+
+    if (parsedCommand.text!.position) {
+      const pos = parsedCommand.text!.position.toLowerCase();
+      if (pos === "top-left") { x = "left"; y = "top"; }
+      else if (pos === "top-right") { x = "right"; y = "top"; }
+      else if (pos === "bottom-left") { x = "left"; y = "bottom"; }
+      else if (pos === "bottom-right") { x = "right"; y = "bottom"; }
+      else if (pos === "left" || pos === "right") { x = pos; y = "center"; }
+      else if (pos === "top" || pos === "bottom" || pos === "center") { y = pos; }
+    }
+
+    // Map text style to font
+    if (parsedCommand.text!.style) {
+      const style = parsedCommand.text!.style.toLowerCase();
+      switch (style) {
+        case "serif": fontFamily = "serif"; break;
+        case "monospace": case "mono": fontFamily = "RobotoMono, monospace"; break;
+        case "handwriting": case "script": fontFamily = "Roboto, sans-serif"; fontWeight = "normal"; break;
+        case "thin": fontWeight = "normal"; break;
+        case "bold": fontWeight = "bold"; break;
+      }
+    }
+
+    logger.info("Using font settings", {
+      fontFamily,
+      fontWeight,
+      fontSize,
+      textStyle: parsedCommand.text!.style,
+    });
+
+    const newResultBuffer = await addTextToImage(
+      resultBuffer,
+      parsedCommand.text!.content,
+      {
+        x,
+        y,
+        fontSize,
+        fontFamily,
+        fontWeight,
+        color,
+        strokeColor: undefined,
+        strokeWidth: 0,
+        shadow: undefined,
+        backgroundColor: parsedCommand.text!.backgroundColor,
+        padding: 10,
+        maxWidth: 800,
+        lineHeight: 1.2,
+        align: "center",
+      }
+    );
+
+    // Update preview with text
+    previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    const imageWithText = await loadImage(newResultBuffer);
+    previewCtx.drawImage(
+      imageWithText,
+      0,
+      0,
+      imageWithText.width,
+      imageWithText.height,
+      0,
+      0,
+      previewCanvas.width,
+      previewCanvas.height
+    );
+
+    return {
+      resultBuffer: newResultBuffer,
+      previewBuffer: previewCanvas.toBuffer("image/png"),
+    };
+  }
+
+  /**
+   * Store result in memory, Grove, and history — return final AgentResponse
+   */
+  private async finalizeResult(
+    resultId: string,
+    previewId: string,
+    requestId: string,
+    parsedCommand: ParsedCommand,
+    resultBuffer: Buffer,
+    previewBuffer: Buffer,
+    baseUrl: string,
+    walletAddressForOverlay?: string,
+    isFarcaster: boolean = false
+  ): Promise<AgentResponse> {
+    // Store in memory
+    storeImage(resultId, resultBuffer, "image/png");
+    storeImage(previewId, previewBuffer, "image/png");
+
+    const resultUrl = `${baseUrl}/api/image?id=${resultId}`;
+    const previewUrl = `${baseUrl}/api/image?id=${previewId}`;
+
+    // Store in Grove
+    const groveResult = await this.storeInGrove(
+      resultBuffer,
+      resultId,
+      parsedCommand.overlayMode,
+      walletAddressForOverlay,
+      isFarcaster
+    );
+
+    // Store in history
+    await storeImageUrl(requestId, resultUrl, groveResult.groveUri, groveResult.groveUrl);
+
+    return {
+      id: requestId,
+      status: "completed",
+      resultUrl,
+      previewUrl,
+      groveUri: groveResult.groveUri,
+      groveUrl: groveResult.groveUrl,
+    };
+  }
+
+  /**
+   * Upload to Grove storage with Farcaster retry
+   */
+  private async storeInGrove(
+    resultBuffer: Buffer,
+    resultId: string,
+    overlayMode?: string,
+    walletAddress?: string,
+    isFarcaster: boolean = false
+  ): Promise<{ groveUri?: string; groveUrl?: string }> {
+    let groveUri: string | undefined;
+    let groveUrl: string | undefined;
+
+    logger.info(`Storing ${overlayMode || "generated"} image in Grove`);
+
+    try {
+      const fileName = `${overlayMode || "generated"}-${resultId}.png`;
+
+      if (isFarcaster) {
+        logger.info("Request is from Farcaster, prioritizing Grove storage");
+      }
+
+      const groveResult = await uploadToGrove(
+        resultBuffer,
+        fileName,
+        walletAddress
+      );
+
+      if (groveResult.uri && groveResult.gatewayUrl) {
+        groveUri = groveResult.uri;
+        groveUrl = groveResult.gatewayUrl;
+        logger.info("Successfully stored image in Grove", {
+          groveUri,
+          groveUrl,
+          walletAddress: walletAddress || "none",
+          isFarcaster,
+        });
+      } else {
+        logger.warn("Grove storage returned empty URI or URL", {
+          uri: groveResult.uri,
+          gatewayUrl: groveResult.gatewayUrl,
+          walletAddress: walletAddress || "none",
+          isFarcaster,
+        });
+
+        // Retry for Farcaster requests
+        if (isFarcaster) {
+          const retryResult = await this.retryGroveUpload(
+            resultBuffer,
+            resultId,
+            overlayMode
+          );
+          if (retryResult) {
+            groveUri = retryResult.groveUri;
+            groveUrl = retryResult.groveUrl;
+          }
+        }
+      }
+    } catch (error) {
+      logger.error("Failed to store image in Grove", {
+        error: error instanceof Error ? error.message : String(error),
+        walletAddress: walletAddress || "none",
+      });
+    }
+
+    return { groveUri, groveUrl };
+  }
+
+  /**
+   * Retry Grove upload for Farcaster requests
+   */
+  private async retryGroveUpload(
+    resultBuffer: Buffer,
+    resultId: string,
+    overlayMode?: string
+  ): Promise<{ groveUri: string; groveUrl: string } | null> {
+    logger.info("Retrying Grove storage for Farcaster request");
+    try {
+      const retryFileName = `retry-${overlayMode || "generated"}-${resultId}.png`;
+      const retryResult = await uploadToGrove(resultBuffer, retryFileName);
+
+      if (retryResult.uri && retryResult.gatewayUrl) {
+        logger.info("Successfully stored image in Grove on retry", {
+          groveUri: retryResult.uri,
+          groveUrl: retryResult.gatewayUrl,
+        });
+        return { groveUri: retryResult.uri, groveUrl: retryResult.gatewayUrl };
+      }
+      return null;
+    } catch (retryError) {
+      logger.error("Failed to store image in Grove on retry", {
+        error:
+          retryError instanceof Error
+            ? retryError.message
+            : String(retryError),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Apply parent image context to parsed command
+   */
+  private applyParentImageContext(
+    parsedCommand: ParsedCommand,
+    parentImageUrl: string
+  ): void {
+    logger.info("Using parent image URL", { parentImageUrl });
+    parsedCommand.baseImageUrl = parentImageUrl;
+
+    if (!parsedCommand.useParentImage && parsedCommand.action !== "generate") {
+      const hasDescriptivePrompt =
+        parsedCommand.prompt && parsedCommand.prompt.length > 10;
+
+      if (!hasDescriptivePrompt && parsedCommand.overlayMode) {
+        parsedCommand.useParentImage = true;
+        parsedCommand.action = "overlay";
+        logger.info(
+          "No descriptive prompt with overlay mode, applying to parent image",
+          { overlayMode: parsedCommand.overlayMode }
+        );
+      } else if (!parsedCommand.overlayMode && !parsedCommand.text) {
+        parsedCommand.overlayMode = "degenify";
+        parsedCommand.useParentImage = true;
+        parsedCommand.action = "overlay";
+        logger.info(
+          "No overlay mode specified with parent image, defaulting to degenify"
+        );
+      }
+    }
+  }
+
+  /**
+   * Resolve action when no parent image is provided
+   */
+  private resolveActionWithoutParent(
+    parsedCommand: ParsedCommand,
+    rawCommand: string
+  ): void {
+    if (
+      parsedCommand.overlayMode &&
+      parsedCommand.action !== "generate" &&
+      parsedCommand.action !== "overlay"
+    ) {
+      const hasDescriptivePrompt =
+        parsedCommand.prompt && parsedCommand.prompt.length > 10;
+
+      if (hasDescriptivePrompt) {
+        parsedCommand.action = "generate";
+        logger.info(
+          "Setting action to generate based on descriptive prompt with overlay",
+          { overlayMode: parsedCommand.overlayMode, prompt: parsedCommand.prompt }
+        );
+      } else {
+        parsedCommand.action = "generate";
+        parsedCommand.prompt =
+          DEFAULT_OVERLAY_PROMPTS[parsedCommand.overlayMode] ||
+          "a simple background";
+        logger.info(
+          "Setting action to generate with default prompt for overlay",
+          { overlayMode: parsedCommand.overlayMode, defaultPrompt: parsedCommand.prompt }
+        );
+      }
+    }
+
+    if (
+      parsedCommand.action === "generate" &&
+      (!parsedCommand.prompt || parsedCommand.prompt.length < 3)
+    ) {
+      const promptMatch = rawCommand.match(
+        /^(?:generate|create|make|draw)\s+(?:a|an)?\s*(?:image|picture|photo)?\s*(?:of|with)?\s*(.*)/i
+      );
+      if (promptMatch && promptMatch[1]) {
+        parsedCommand.prompt = promptMatch[1].trim();
+      } else {
+        parsedCommand.prompt = rawCommand
+          .replace(/^(generate|create|make|draw)\s+/i, "")
+          .replace(/^(a|an)\s+(image|picture|photo)\s+of\s+/i, "")
+          .trim();
+      }
+
+      logger.info("Extracted prompt for generation command", {
+        prompt: parsedCommand.prompt,
+      });
     }
   }
 }
