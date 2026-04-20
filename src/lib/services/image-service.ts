@@ -432,8 +432,8 @@ export class ImageService {
       ctx.globalAlpha = 1;
     }
 
-    // Apply overlay image
-    if (parsedCommand.overlayMode) {
+    // Apply overlay image (skip for wowowify — it's the "no overlay" mode)
+    if (parsedCommand.overlayMode && parsedCommand.overlayMode !== "wowowify") {
       await this.applyOverlayToCanvas(
         ctx,
         canvas,
@@ -655,12 +655,15 @@ export class ImageService {
     walletAddressForOverlay?: string,
     isFarcaster: boolean = false
   ): Promise<AgentResponse> {
-    // Store in memory
-    storeImage(resultId, resultBuffer, "image/png");
-    storeImage(previewId, previewBuffer, "image/png");
+    // Store images (Vercel Blob when configured, in-memory fallback otherwise)
+    const [resultUrl, previewUrl] = await Promise.all([
+      storeImage(resultId, resultBuffer, "image/png"),
+      storeImage(previewId, previewBuffer, "image/png"),
+    ]);
 
-    const resultUrl = `${baseUrl}/api/image?id=${resultId}`;
-    const previewUrl = `${baseUrl}/api/image?id=${previewId}`;
+    // Prefix with baseUrl only for in-memory URLs (relative paths)
+    const fullResultUrl = resultUrl.startsWith("/") ? `${baseUrl}${resultUrl}` : resultUrl;
+    const fullPreviewUrl = previewUrl.startsWith("/") ? `${baseUrl}${previewUrl}` : previewUrl;
 
     // Store in Grove
     const groveResult = await this.storeInGrove(
@@ -671,14 +674,19 @@ export class ImageService {
       isFarcaster
     );
 
-    // Store in history
-    await storeImageUrl(requestId, resultUrl, groveResult.groveUri, groveResult.groveUrl);
+    // Store in history under requestId, resultId, AND previewId so that
+    // /api/image?id=<any of these> can look up the Blob URL after a cold start
+    await Promise.all([
+      storeImageUrl(requestId, fullResultUrl, groveResult.groveUri, groveResult.groveUrl),
+      storeImageUrl(resultId, fullResultUrl, groveResult.groveUri, groveResult.groveUrl),
+      storeImageUrl(previewId, fullPreviewUrl, groveResult.groveUri, groveResult.groveUrl),
+    ]);
 
     return {
       id: requestId,
       status: "completed",
-      resultUrl,
-      previewUrl,
+      resultUrl: fullResultUrl,
+      previewUrl: fullPreviewUrl,
       groveUri: groveResult.groveUri,
       groveUrl: groveResult.groveUrl,
     };

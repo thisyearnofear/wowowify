@@ -1,7 +1,13 @@
 import React from "react";
-import { OverlayMode, OVERLAY_COLORS, OVERLAY_DESCRIPTIONS } from "@/lib/config/overlays";
+import {
+  OverlayMode,
+  OVERLAY_COLORS,
+  OVERLAY_DESCRIPTIONS,
+  PRESET_OVERLAY_PATHS,
+  AI_TRANSFORM_MODES,
+} from "@/lib/config/overlays";
 
-/** Reusable overlay mode button with color theming and tooltip */
+/** Reusable overlay mode button with color theming, tooltip, and preview thumbnail */
 function OverlayButton({
   mode: currentMode,
   onClick,
@@ -17,6 +23,9 @@ function OverlayButton({
   const isActive = currentMode === name;
   const description = OVERLAY_DESCRIPTIONS[name] || "";
   const tooltipId = `tooltip-${name}`;
+  const presetPath = PRESET_OVERLAY_PATHS[name];
+  const isAITransform = AI_TRANSFORM_MODES.includes(name);
+
   return (
     <div className="tooltip-wrapper">
       <button
@@ -24,10 +33,26 @@ function OverlayButton({
         onClick={() => onClick(name)}
         title={description}
         aria-describedby={description ? tooltipId : undefined}
-        className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1
+        className={`p-2 rounded-lg transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden
           ${isActive ? colors.active : `${colors.bg} ${colors.text} ${colors.hover}`}`}
       >
-        <span className="text-lg">{icon}</span>
+        {/* Preview thumbnail */}
+        <div className="w-10 h-10 rounded flex items-center justify-center overflow-hidden bg-white/50">
+          {presetPath ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={presetPath}
+              alt={`${name} overlay preview`}
+              className="w-full h-full object-contain"
+            />
+          ) : isAITransform ? (
+            <span className="text-2xl">{icon}</span>
+          ) : name === "wowowify" ? (
+            <span className="text-2xl">{icon}</span>
+          ) : (
+            <span className="text-lg">{icon}</span>
+          )}
+        </div>
         <span className="text-xs font-medium capitalize">{name}</span>
       </button>
       {description && (
@@ -139,6 +164,7 @@ export const StyleStage = ({
         </div>
 
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          <OverlayButton mode={mode} onClick={loadPresetOverlay} name="wowowify" icon="🎨" />
           <OverlayButton mode={mode} onClick={loadPresetOverlay} name="degenify" icon="🎩" />
           <OverlayButton mode={mode} onClick={loadPresetOverlay} name="higherify" icon="↑" />
           <OverlayButton mode={mode} onClick={loadPresetOverlay} name="scrollify" icon="📜" />

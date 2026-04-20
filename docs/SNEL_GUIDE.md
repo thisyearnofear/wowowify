@@ -32,6 +32,7 @@ Reply to a cast containing an image with:
 
 ## Available Overlays
 
+- `wowowify` - No overlay stamp — generates an AI image only (use with a color tint for background effects)
 - `degenify` - Degen-style overlay
 - `higherify` - Higher-style overlay
 - `scrollify` - Scroll-style overlay
@@ -43,6 +44,7 @@ Reply to a cast containing an image with:
 - `nikefy` - Nike-style overlay
 - `higherise` - Higherise-style overlay
 - `clankerify` - Clanker-style overlay
+- `ghiblify` - AI transformation into Studio Ghibli art style
 
 ## Customization Options
 
@@ -67,6 +69,15 @@ Add text to images with these parameters:
 ```
 @snel generate a beach sunset --text "Summer Vibes" --text-position bottom
 @snel higherify this --text "HIGHER" --text-size 48 --text-color white --text-style bold
+```
+
+## AI Transformations
+
+Transform images into different art styles:
+
+```
+@snel ghiblify this image
+@snel ghiblify a serene natural landscape
 ```
 
 - `--text "Your text here"` - The text content

@@ -30,7 +30,8 @@ curl -X POST https://your-app.com/api/agent \
 The agent understands commands like:
 
 - "Generate an image of [description]"
-- "Apply the [style] overlay" (styles: degenify, higherify, wowowify, scrollify, lensify, higherise, dickbuttify, nikefy, nounify, baseify, clankerify, mantleify)
+- "Apply the [style] overlay" (styles: degenify, higherify, scrollify, lensify, higherise, dickbuttify, nikefy, nounify, baseify, clankerify, mantleify, ghiblify)
+- "Generate an image without overlay" (wowowify mode — AI image only, no stamp overlay)
 - "Position at [x], [y]"
 - "Scale to [size]"
 - "Set color to [color]"
@@ -276,12 +277,15 @@ The application requires the following environment variables:
 ```bash
 VENICE_API_KEY=your_venice_api_key
 REDIS_URL=your_redis_url
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_token  # Optional but recommended for production
+NEXT_PUBLIC_ADMIN_PASSWORD=your_admin_password  # Optional, defaults to "wowowify"
 ```
 
 You can obtain these from:
 
 - Venice AI API key: [Venice AI Dashboard](https://venice.ai)
 - Redis URL: [Upstash Redis](https://upstash.com)
+- Vercel Blob token: [Vercel Blob Dashboard](https://vercel.com/dashboard/stores) (create a Blob store and copy the read/write token)
 
 ## Getting Started
 
@@ -330,7 +334,7 @@ Process natural language commands to generate and manipulate images:
   "parameters": {
     "baseImageUrl": "optional URL to an existing image",
     "prompt": "optional prompt to override NLP extraction",
-    "overlayMode": "degenify" | "higherify" | "wowowify" | "scrollify" | "lensify" | "higherise" | "dickbuttify" | "nikefy" | "nounify" | "baseify" | "clankerify" | "mantleify",
+    "overlayMode": "degenify" | "higherify" | "wowowify" /* no overlay stamp, AI image only */ | "scrollify" | "lensify" | "higherise" | "dickbuttify" | "nikefy" | "nounify" | "baseify" | "clankerify" | "mantleify" | "ghiblify",
     "controls": {
       "scale": 1.2,
       "x": 0,
@@ -349,8 +353,8 @@ Response:
 {
   "id": "unique_request_id",
   "status": "processing" | "completed" | "failed",
-  "resultUrl": "URL to the processed image",
-  "previewUrl": "URL to a preview of the processed image",
+  "resultUrl": "URL to the processed image (Blob URL or /api/image?id=...)",
+  "previewUrl": "URL to a preview of the processed image (Blob URL or /api/image?id=...)",
   "error": "Error message if status is failed",
   "groveUri": "Optional Grove URI for lensify overlay",
   "groveUrl": "Optional Grove URL for lensify overlay"
@@ -381,12 +385,13 @@ When deploying to Vercel or other serverless environments, keep these important 
    - Our application implements its own timeout handling to prevent hanging requests
    - If you experience timeouts, consider upgrading to a Pro plan
 
-2. **Memory Storage**:
+2. **Image Storage**:
 
-   - Images are stored in memory rather than the filesystem in production
-   - This is because serverless functions have ephemeral filesystems
-   - Images are automatically cleaned up to prevent memory leaks
-   - Users should download images they want to keep
+   - When `BLOB_READ_WRITE_TOKEN` is set, images are stored in **Vercel Blob** for persistent, serverless-friendly storage
+   - Without the Blob token, images fall back to in-memory storage (ephemeral — lost on cold starts, dev-only)
+   - The `/api/image` endpoint uses a 3-tier lookup: in-memory Blob tracking → in-memory store → Redis history redirect
+   - All image IDs (requestId, resultId, previewId) are stored in Redis-backed image history for URL resolution after cold starts
+   - Users should download images they want to keep when running without Blob storage
 
 3. **Error Handling**:
 

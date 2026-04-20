@@ -77,7 +77,14 @@ export const PRESET_OVERLAY_PATHS: Record<string, string> = {
   degenify: "/degen/degenify.png",
   higherify: "/higher/arrows/Arrow-png-white.png",
   scrollify: "/scroll/scrollify.png",
+  lensify: "/lens/lensify.png",
+  higherise: "/higher/mantra/higherise.png",
+  dickbuttify: "/dickbutt/dickbuttify.png",
+  nikefy: "/nike/nikeify.png",
+  nounify: "/nouns/nounify.png",
   baseify: "/base/baseify.png",
+  clankerify: "/clanker/clankerify.png",
+  mantleify: "/mantle/mantleify.png",
 };
 
 // Human-readable descriptions for UI tooltips
@@ -94,11 +101,12 @@ export const OVERLAY_DESCRIPTIONS: Record<string, string> = {
   clankerify: "Add the Clanker bot overlay",
   mantleify: "Stamp the Mantle L2 badge",
   ghiblify: "AI transform into Studio Ghibli art style",
-  wowowify: "Default mode — no overlay applied",
+  wowowify: "Generate with no overlay — AI image only",
 };
 
 // Default prompts when no image/prompt is provided per overlay mode
 export const DEFAULT_OVERLAY_PROMPTS: Record<string, string> = {
+  wowowify: "a vibrant, eye-catching abstract artwork",
   higherify: "a mountain landscape with clear sky",
   degenify: "a colorful abstract pattern",
   scrollify: "a minimalist tech background",

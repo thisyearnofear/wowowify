@@ -115,6 +115,14 @@ export default function ImageOverlay() {
       return;
     }
 
+    // Wowowify = no overlay stamp, just apply the color tint + go to adjust stage
+    if (presetMode === "wowowify") {
+      setOverlayImage(null);
+      setOverlayPreviewUrl("");
+      setStage("adjust");
+      return;
+    }
+
     const presetPath = PRESET_OVERLAY_PATHS[presetMode] || "";
 
     if (presetPath) {
@@ -174,15 +182,18 @@ export default function ImageOverlay() {
   };
 
   // Debounced version of combineImages
+  // Works both with overlay images (stamp mode) and without (wowowify / tint-only mode)
   const debouncedCombineImages = useCallback(() => {
     const combineImages = async () => {
-      if (!baseImage || !overlayImage || !canvasRef.current) return;
+      if (!baseImage || !canvasRef.current) return;
+      // Need either an overlay image OR a color tint to show a preview
+      if (!overlayImage && controls.overlayAlpha <= 0) return;
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const loadImage = (src: string): Promise<HTMLImageElement> => {
+      const loadImg = (src: string): Promise<HTMLImageElement> => {
         return new Promise((resolve, reject) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
@@ -194,7 +205,7 @@ export default function ImageOverlay() {
 
       try {
         // Load base image
-        const baseImg = await loadImage(basePreviewUrl);
+        const baseImg = await loadImg(basePreviewUrl);
 
         // Set canvas size to match base image
         canvas.width = baseImg.width;
@@ -211,19 +222,21 @@ export default function ImageOverlay() {
           ctx.globalAlpha = 1;
         }
 
-        // Load and draw overlay image
-        const overlayImg = await loadImage(overlayPreviewUrl);
+        // Load and draw overlay image (skip for wowowify / tint-only mode)
+        if (overlayImage && overlayPreviewUrl) {
+          const overlayImg = await loadImg(overlayPreviewUrl);
 
-        // Calculate scaled dimensions
-        const scaledWidth = overlayImg.width * controls.scale;
-        const scaledHeight = overlayImg.height * controls.scale;
+          // Calculate scaled dimensions
+          const scaledWidth = overlayImg.width * controls.scale;
+          const scaledHeight = overlayImg.height * controls.scale;
 
-        // Calculate position
-        const x = (canvas.width - scaledWidth) / 2 + controls.x;
-        const y = (canvas.height - scaledHeight) / 2 + controls.y;
+          // Calculate position
+          const x = (canvas.width - scaledWidth) / 2 + controls.x;
+          const y = (canvas.height - scaledHeight) / 2 + controls.y;
 
-        // Draw scaled and positioned overlay
-        ctx.drawImage(overlayImg, x, y, scaledWidth, scaledHeight);
+          // Draw scaled and positioned overlay
+          ctx.drawImage(overlayImg, x, y, scaledWidth, scaledHeight);
+        }
 
         // Update preview
         setCombinedPreviewUrl(canvas.toDataURL());
@@ -238,11 +251,12 @@ export default function ImageOverlay() {
   }, [baseImage, overlayImage, controls, basePreviewUrl, overlayPreviewUrl]);
 
   useEffect(() => {
-    if (baseImage && overlayImage) {
+    // Run for overlay mode (overlayImage set) OR tint-only mode (wowowify with alpha > 0)
+    if (baseImage && (overlayImage || controls.overlayAlpha > 0)) {
       const cleanup = debouncedCombineImages();
       return cleanup;
     }
-  }, [baseImage, overlayImage, debouncedCombineImages]);
+  }, [baseImage, overlayImage, controls.overlayAlpha, debouncedCombineImages]);
 
   const handleDownload = () => {
     if (!combinedPreviewUrl) return;
@@ -410,7 +424,7 @@ export default function ImageOverlay() {
                   updateControl={updateControl}
                   onDownload={handleDownload}
                   onBack={handleBack}
-                  showControls={mode !== "ghiblify"}
+                  showControls={mode !== "ghiblify" && mode !== "wowowify"}
                 />
               )}
             </div>

@@ -9,11 +9,34 @@ import { ImageRecord } from "@/lib/metrics";
 import BaseNFTGallery from "@/components/BaseNFTGallery";
 import L2NFTGallery from "@/components/L2NFTGallery";
 
+/**
+ * Admin password — set NEXT_PUBLIC_ADMIN_PASSWORD env var; defaults to "wowowify" for dev.
+ * NOTE: This is client-side-only auth (a mild UI deterrent). The password is visible
+ * in the JS bundle. For proper security, add server-side middleware or API validation.
+ */
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "wowowify";
+
 function AdminContent() {
+  // --- Auth state (must be declared before any conditional return) ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [authError, setAuthError] = useState("");
+
+  // --- Gallery state (must be declared before any conditional return) ---
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      setAuthError("");
+    } else {
+      setAuthError("Incorrect password");
+    }
+  };
 
   // Use useCallback to memoize the fetchImages function
   const fetchImages = useCallback(async () => {
@@ -51,8 +74,10 @@ function AdminContent() {
   }, []);
 
   useEffect(() => {
-    fetchImages();
-  }, [fetchImages]);
+    if (isAuthenticated) {
+      fetchImages();
+    }
+  }, [fetchImages, isAuthenticated]);
 
   // Get the best available image URL (Grove URL if available, otherwise temporary URL)
   const getBestImageUrl = (image: ImageRecord): string => {
@@ -66,6 +91,51 @@ function AdminContent() {
     return image.resultUrl;
   };
 
+  // --- Auth gate (after all hooks) ---
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto p-4 max-w-4xl">
+        <Navigation />
+        <div className="flex justify-center mb-4">
+          <Image
+            src="/wowwowowify.png"
+            alt="WOWOWIFY"
+            width={200}
+            height={200}
+            className="w-32 h-auto"
+            priority
+          />
+        </div>
+        <div className="max-w-sm mx-auto mt-8">
+          <form onSubmit={handleLogin} className="space-y-4">
+            <h2 className="text-xl font-bold text-center">Admin Access</h2>
+            <p className="text-sm text-center text-gray-500">
+              Enter the admin password to continue
+            </p>
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="Password"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+              autoFocus
+            />
+            {authError && (
+              <p className="text-sm text-red-600 text-center">{authError}</p>
+            )}
+            <button
+              type="submit"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Sign In
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Authenticated admin content ---
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <Navigation />

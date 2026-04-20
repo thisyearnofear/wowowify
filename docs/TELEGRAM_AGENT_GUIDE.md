@@ -179,9 +179,9 @@ Your bot can use these command formats:
 
 ## Available Overlay Modes
 
+- `wowowify` - No overlay stamp — generates an AI image only (use with a color tint for background effects)
 - `degenify` - Degen-style overlay
 - `higherify` - Higher-style overlay
-- `wowowify` - WOWOW-style overlay
 - `scrollify` - Scroll-style overlay
 - `lensify` - Lens-style overlay
 - `higherise` - Higherise-style overlay
@@ -191,6 +191,7 @@ Your bot can use these command formats:
 - `baseify` - Base-style overlay
 - `clankerify` - Clanker-style overlay
 - `mantleify` - Mantle-style overlay
+- `ghiblify` - AI transformation into Studio Ghibli art style
 
 ## Response Format
 
@@ -200,8 +201,8 @@ The API will respond with a JSON object like this:
 {
   "id": "unique_request_id",
   "status": "completed", // or "processing", "failed"
-  "resultUrl": "https://wowowifyer.vercel.app/api/image?id=unique_id", // URL to the resulting image
-  "previewUrl": "https://wowowifyer.vercel.app/api/image?id=unique_id&preview=true", // Preview URL
+  "resultUrl": "https://...", // Vercel Blob URL (when configured) or /api/image?id=...
+  "previewUrl": "https://...", // Preview URL (same storage scheme)
   "error": "Error message if status is failed",
   "groveUri": "Optional Grove URI for lensify overlay",
   "groveUrl": "Optional Grove URL for lensify overlay"
