@@ -36,7 +36,7 @@ export async function uploadToGrove(
     });
 
     // Create a File object from the buffer
-    const blob = new Blob([imageBuffer], { type: "image/png" });
+    const blob = new Blob([new Uint8Array(imageBuffer)], { type: "image/png" });
     const file = new File([blob], fileName, { type: "image/png" });
 
     // Use immutable ACL for simplicity, even with wallet address

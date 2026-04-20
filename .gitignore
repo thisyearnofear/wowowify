@@ -81,3 +81,4 @@ Thumbs.db
 # Ensure fonts are included in the repository
 !public/fonts/
 !public/fonts/*.ttf
+bun.lock

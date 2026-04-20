@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Return the image with appropriate headers
-    return new NextResponse(imageData.buffer, {
+    return new NextResponse(new Uint8Array(imageData.buffer), {
       headers: {
         "Content-Type": imageData.contentType,
         "Cache-Control": "public, max-age=3600",
