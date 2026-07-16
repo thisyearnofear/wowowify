@@ -7,49 +7,73 @@
     "build": "npm run download-fonts && next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-install": "npm install --legacy-peer-deps",
+    "lint:fix": "next lint --fix",
+    "vercel-install": "socket install --legacy-peer-deps",
+    "install:safe": "socket npm install",
+    "socket": "socket",
+    "secrets:scan": "secretlint \"**/*\" --secretlintrc .secretlintrc.json",
+    "validate:types": "tsc --noEmit",
+    "validate": "npm run validate:types && npm run lint && npm run test && npm run secrets:scan",
+    "prepare": "husky || true",
     "test-text-overlay": "chmod +x scripts/test-text-functionality.sh && ./scripts/test-text-functionality.sh",
     "test-text-standalone": "chmod +x scripts/run-standalone-test.sh && ./scripts/run-standalone-test.sh",
-    "download-fonts": "node scripts/download-fonts.js"
+    "download-fonts": "node scripts/download-fonts.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "eslint --fix"
+    ],
+    "*": [
+      "secretlint --secretlintrc .secretlintrc.json"
+    ]
   },
   "dependencies": {
-    "@farcaster/frame-sdk": "^0.0.31",
-    "@farcaster/frame-wagmi-connector": "^0.0.19",
-    "@farcaster/miniapp-sdk": "^0.1.10",
+    "@farcaster/frame-sdk": "^0.2.0",
+    "@farcaster/frame-wagmi-connector": "^2.0.0",
+    "@farcaster/miniapp-sdk": "^0.3.0",
     "@google/generative-ai": "^0.23.0",
     "@lens-chain/storage-client": "^1.0.3",
     "@neynar/nodejs-sdk": "^2.19.0",
-    "@tanstack/react-query": "^5.67.2",
+    "@tanstack/react-query": "5.67.2",
     "@types/lodash": "^4.17.15",
     "@vercel/blob": "^2.3.3",
     "canvas": "^3.1.0",
-    "connectkit": "^1.8.2",
+    "connectkit": "^1.9.2",
     "dotenv": "^16.4.7",
     "ethers": "^6.13.5",
     "ioredis": "^5.6.0",
     "lodash": "^4.17.21",
-    "next": "15.5.15",
+    "next": "15.5.18",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "replicate": "^0.25.2",
     "uuid": "^11.1.0",
-    "viem": "^2.23.8",
-    "wagmi": "^2.14.12"
+    "viem": "^2.55.2",
+    "wagmi": "^3.7.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@secretlint/secretlint-rule-preset-recommend": "^9.3.4",
+    "@socketsecurity/cli": "^1.1.102",
     "@types/ioredis": "^4.28.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "@vitest/coverage-v8": "^4.1.4",
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
     "node-fetch": "^3.3.2",
     "pino-pretty": "^13.0.0",
     "postcss": "^8",
+    "secretlint": "^9.3.4",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   },
   "overrides": {
     "connectkit": {
@@ -57,5 +81,8 @@
       "react-dom": "$react-dom"
     },
     "axios": "^1.15.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

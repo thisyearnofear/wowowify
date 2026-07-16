@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { encodeFunctionData, parseAbiItem } from "viem";
+import { logger } from "@/lib/logger";
 
 // Deployed contract address on Scroll Sepolia
 const CONTRACT_ADDRESS = "0xf230170c3afd6bea32ab0d7747c04a831bf24968";
@@ -69,7 +70,7 @@ export default function MintScrollifyNFTButton({
           const decimal = parseInt(chainIdHex, 16);
           setChainId(decimal);
 
-          console.log("Current chain ID:", {
+          logger.info("MintScrollify: chain check", {
             hex: chainIdHex,
             decimal: decimal,
             isCorrect:
@@ -115,7 +116,7 @@ export default function MintScrollifyNFTButton({
 
     // If already on the correct network, don't try to switch
     if (isCorrectNetwork) {
-      console.log("Already on Scroll Sepolia, no need to switch");
+      logger.info("MintScrollify: already on correct network");
       return;
     }
 
@@ -136,7 +137,7 @@ export default function MintScrollifyNFTButton({
       setChainIdHex(newChainIdHex);
       setChainId(parseInt(newChainIdHex, 16));
 
-      console.log("Switched to chain:", {
+      logger.info("MintScrollify: switched chain", {
         hex: newChainIdHex,
         decimal: parseInt(newChainIdHex, 16),
       });
@@ -237,7 +238,7 @@ export default function MintScrollifyNFTButton({
           ],
         });
 
-        console.log("Mint price from contract:", mintPriceHex);
+        logger.info("MintScrollify: mint price from contract", { mintPriceHex });
 
         try {
           // Try with the primary ABI first

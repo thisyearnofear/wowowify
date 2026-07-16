@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-import { logger } from "@/lib/logger";
 import { getMetrics } from "@/lib/metrics";
 
-export async function GET() {
-  const { totalRequests, failedRequests, lastReset } = getMetrics();
+export const dynamic = "force-dynamic";
 
-  logger.info("Metrics requested", {
-    totalRequests,
-    failedRequests,
-    lastReset,
-  });
+export async function GET() {
+  const { totalRequests, failedRequests, lastReset } = await getMetrics();
 
   const metrics = [
     "# HELP api_requests_total Total number of API requests",

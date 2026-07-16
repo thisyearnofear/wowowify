@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    incrementTotalRequests();
+    incrementTotalRequests().catch(() => {});
 
     // Get client IP
     const headersList = await headers();
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     if (!rateLimitInfo.isAllowed) {
       logger.warn("Rate limit exceeded", { ip });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         {
           error: `Rate limit exceeded. Try again in ${rateLimitInfo.timeToReset} seconds`,
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     // Validate API configuration
     if (!process.env.VENICE_API_KEY) {
       logger.error("VENICE_API_KEY is not configured");
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         { error: "Server configuration error" },
         { status: 500 }
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
         ip,
         error: error instanceof Error ? error.message : "Unknown parsing error",
       });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         { error: "Invalid request body" },
         { status: 400, headers: responseHeaders }
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 
     if (!prompt) {
       logger.warn("Missing prompt in request", { ip });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         { error: "Prompt is required" },
         { status: 400, headers: responseHeaders }
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
     if (!ALLOWED_MODELS.includes(model)) {
       logger.warn("Invalid model requested", { ip, model });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         {
           error: `Invalid model. Allowed models are: ${ALLOWED_MODELS.join(
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         logger.error("Request timeout", { ip });
-        incrementFailedRequests();
+        incrementFailedRequests().catch(() => {});
         return NextResponse.json(
           {
             error:
@@ -179,7 +179,7 @@ export async function POST(request: Request) {
         error: error instanceof Error ? error.message : "Unknown error",
         ip,
       });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         { error: "Failed to wowowify. Please try again." },
         { status: 500, headers: responseHeaders }

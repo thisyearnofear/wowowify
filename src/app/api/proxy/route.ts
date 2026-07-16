@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 /**
  * Proxy API route to fetch IPFS content and bypass CORS issues
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  console.log("Proxy request for URL:", url);
+  logger.info("Proxy: incoming fetch", { url });
 
   try {
     // Validate that the URL is from allowed domains
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log("Fetching content from:", url);
+    logger.info("Proxy: fetching content", { url });
 
     // Fetch the content with a timeout
     const controller = new AbortController();
@@ -68,11 +69,11 @@ export async function GET(request: NextRequest) {
     // Get the content type from the original response
     const contentType =
       response.headers.get("content-type") || "application/octet-stream";
-    console.log("Content type:", contentType);
+    logger.info("Proxy: content type", { contentType });
 
     // Get the response as an array buffer
     const buffer = await response.arrayBuffer();
-    console.log(`Successfully proxied ${buffer.byteLength} bytes`);
+    logger.info("Proxy: succeeded", { bytes: buffer.byteLength });
 
     // Return the proxied response with the same content type
     return new NextResponse(buffer, {

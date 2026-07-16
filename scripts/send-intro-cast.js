@@ -1,5 +1,5 @@
 /**
- * Script to send an introductory cast for the @snel bot
+ * Script to send an introductory cast for the @toka bot
  *
  * Usage:
  * node scripts/send-intro-cast.js

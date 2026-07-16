@@ -1,151 +1,63 @@
 import { ParsedCommand } from "../agent-types";
 import { logger } from "../logger";
 import { OverlayMode, OVERLAY_KEYWORDS } from "@/lib/config/overlays";
+import {
+  URL_PATTERN,
+  OVERLAY_PATTERNS,
+  POSITION_PATTERNS,
+  SCALE_PATTERNS,
+  COLOR_PATTERNS,
+  OPACITY_PATTERNS,
+  GENERATE_PATTERNS,
+  PARENT_IMAGE_PATTERNS,
+  CONTROL_INSTRUCTION_PATTERNS,
+  TEXT_PATTERNS,
+  TEXT_POSITION_PATTERNS,
+  TEXT_SIZE_PATTERNS,
+  TEXT_COLOR_PATTERNS,
+  TEXT_STYLE_PATTERNS,
+  PROMPT_SECTION_PATTERN,
+  OVERLAY_SECTION_PATTERN,
+  TEXT_SECTION_PATTERN,
+  PROMPT_ALT_PATTERN,
+  OVERLAY_ALT_PATTERN,
+  TEXT_ALT_PATTERN,
+  CAPTION_PATTERN,
+  WOWOW_PATTERN,
+} from "./parser-patterns";
 
 /**
- * Base class for command parsers
- * This provides common functionality and patterns used by all parsers
+ * Base class for command parsers.
+ *
+ * Provides common parse logic used by `FarcasterCommandParser` and
+ * `AgentCommandParser`. Regex payloads themselves live in
+ * `./parser-patterns` (data-only module per MODULAR + ORGANIZED); this
+ * class re-exports each as a `protected readonly` field so subclass
+ * `this.X` access continues to compile unchanged.
  */
 export class BaseCommandParser {
-  // Common regex patterns used by all parsers
-  protected URL_PATTERN = /https?:\/\/[^\s]+/;
-
-  protected OVERLAY_PATTERNS = [
-    /apply\s+(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)/i,
-    /use\s+(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)/i,
-    /with\s+(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)/i,
-  ];
-
-  protected POSITION_PATTERNS = [
-    /position\s+(?:at|to)?\s*(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/i,
-    /move\s+(?:to)?\s*(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/i,
-    /place\s+(?:at)?\s*(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/i,
-  ];
-
-  protected SCALE_PATTERNS = [
-    /scale\s+(?:to|by)?\s*(-?\d+\.?\d*)/i,
-    /resize\s+(?:to|by)?\s*(-?\d+\.?\d*)/i,
-    /size\s+(?:to|of)?\s*(-?\d+\.?\d*)/i,
-  ];
-
-  protected COLOR_PATTERNS = [
-    /color\s+(?:to|of)?\s*([a-z]+)/i,
-    /set\s+color\s+(?:to|of)?\s*([a-z]+)/i,
-  ];
-
-  protected OPACITY_PATTERNS = [
-    /opacity\s+(?:to|of)?\s*(-?\d+\.?\d*)/i,
-    /alpha\s+(?:to|of)?\s*(-?\d+\.?\d*)/i,
-    /transparent\s+(?:to|of)?\s*(-?\d+\.?\d*)/i,
-  ];
-
-  protected GENERATE_PATTERNS = [
-    /generate\s+(?:an?\s+image\s+(?:of|with))?\s*(.*)/i,
-    /create\s+(?:an?\s+image\s+(?:of|with))?\s*(.*)/i,
-    /make\s+(?:an?\s+image\s+(?:of|with))?\s*(.*)/i,
-  ];
-
-  protected PARENT_IMAGE_PATTERNS = [
-    /overlay\s+(?:on|to|onto)\s+(?:this|parent|above|previous)\s+image/i,
-    /apply\s+(?:to|on|onto)\s+(?:this|parent|above|previous)\s+image/i,
-    /use\s+(?:this|parent|above|previous)\s+image/i,
-    /(?:this|parent|above|previous)\s+image/i,
-    /overlay\s+this/i,
-    /apply\s+to\s+this/i,
-    /this\s+photo/i,
-    /this\s+picture/i,
-    /this\s+cast/i,
-    /this\s+one/i,
-    /^(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)\s+this/i,
-    /^(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)\.?\s*$/i,
-    /add\s+(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)\s+to\s+this/i,
-    /put\s+(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)\s+on\s+this/i,
-    /^(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)\s+it/i,
-    /^(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)\s+the\s+image/i,
-    /^(higherify|degenify|scrollify|lensify|higherise|dickbuttify|nikefy|nounify|baseify|clankerify|mantleify|ghiblify)/i,
-  ];
-
-  protected CONTROL_INSTRUCTION_PATTERNS = [
-    /scale\s+(?:to|by)?\s*-?\d+\.?\d*/gi,
-    /resize\s+(?:to|by)?\s*-?\d+\.?\d*/gi,
-    /size\s+(?:to|of)?\s*-?\d+\.?\d*/gi,
-    /position\s+(?:at|to)?\s*-?\d+\.?\d*[,\s]+-?\d+\.?\d*/gi,
-    /move\s+(?:to)?\s*-?\d+\.?\d*[,\s]+-?\d+\.?\d*/gi,
-    /place\s+(?:at)?\s*-?\d+\.?\d*[,\s]+-?\d+\.?\d*/gi,
-    /color\s+(?:to|of)?\s*[a-z]+/gi,
-    /set\s+color\s+(?:to|of)?\s*[a-z]+/gi,
-    /opacity\s+(?:to|of)?\s*-?\d+\.?\d*/gi,
-    /alpha\s+(?:to|of)?\s*-?\d+\.?\d*/gi,
-    /transparent\s+(?:to|of)?\s*-?\d+\.?\d*/gi,
-    /set\s+opacity\s+(?:to)?\s*-?\d+\.?\d*/gi,
-    /overlay\s+(?:on|to|onto)\s+(?:this|parent|above|previous)\s+image/gi,
-    /apply\s+(?:to|on|onto)\s+(?:this|parent|above|previous)\s+image/gi,
-    /use\s+(?:this|parent|above|previous)\s+image/gi,
-    /(?:this|parent|above|previous)\s+image/gi,
-    /--text\s+"[^"]+"/gi,
-    /--text\s+'[^']+'/gi,
-    /--text\s+[^,\.\s][^,\.]+/gi,
-    /--text-position\s+\w+/gi,
-    /--text-size\s+\d+/gi,
-    /--text-color\s+\w+/gi,
-    /--text-style\s+\w+/gi,
-    /--caption\s+"[^"]+"/gi,
-    /--caption\s+'[^']*'/gi,
-    /--caption\s+[^,\.\s][^,\.]+/gi,
-    /--caption-position\s+\w+/gi,
-    /--caption-size\s+\d+/gi,
-    /--caption-color\s+\w+/gi,
-    /--caption-style\s+\w+/gi,
-    /--font-size\s+\d+/gi,
-    /--font-color\s+\w+/gi,
-    /--font-style\s+\w+/gi,
-  ];
-
-  protected TEXT_PATTERNS = [
-    /--text\s+"([^"]+)"/i,
-    /--text\s+'([^']+)'/i,
-    /--text\s+([^,\.]+)/i,
-    /--caption\s+"([^"]+)"/i,
-    /--caption\s+'([^']+)'/i,
-    /--caption\s+([^,\.]+)/i,
-  ];
-
-  protected TEXT_POSITION_PATTERNS = [
-    /--text-position\s+(\w+)/i,
-    /--caption-position\s+(\w+)/i,
-  ];
-
-  protected TEXT_SIZE_PATTERNS = [
-    /--text-size\s+(\d+)/i,
-    /--font-size\s+(\d+)/i,
-    /--caption-size\s+(\d+)/i,
-  ];
-
-  protected TEXT_COLOR_PATTERNS = [
-    /--text-color\s+(\w+)/i,
-    /--font-color\s+(\w+)/i,
-    /--caption-color\s+(\w+)/i,
-  ];
-
-  protected TEXT_STYLE_PATTERNS = [
-    /--text-style\s+(\w+)/i,
-    /--font-style\s+(\w+)/i,
-    /--caption-style\s+(\w+)/i,
-  ];
-
-  protected PROMPT_SECTION_PATTERN =
-    /\[PROMPT\]:\s*(.*?)(?=\[OVERLAY\]|\[TEXT\]|$)/i;
-  protected OVERLAY_SECTION_PATTERN =
-    /\[OVERLAY\]:\s*(.*?)(?=\[PROMPT\]|\[TEXT\]|$)/i;
-  protected TEXT_SECTION_PATTERN =
-    /\[TEXT\]:\s*(.*?)(?=\[PROMPT\]|\[OVERLAY\]|$)/i;
-
-  protected PROMPT_ALT_PATTERN = /PROMPT:\s*(.*?)(?=OVERLAY:|TEXT:|$)/i;
-  protected OVERLAY_ALT_PATTERN = /OVERLAY:\s*(.*?)(?=PROMPT:|TEXT:|$)/i;
-  protected TEXT_ALT_PATTERN = /TEXT:\s*(.*?)(?=PROMPT:|OVERLAY:|$)/i;
-
-  protected CAPTION_PATTERN = /CAPTION:\s*(.*?)(?=PROMPT:|OVERLAY:|WOWOW:|$)/i;
-  protected WOWOW_PATTERN = /WOWOW:\s*(.*?)(?=PROMPT:|CAPTION:|TEXT:|$)/i;
+  protected readonly URL_PATTERN = URL_PATTERN;
+  protected readonly OVERLAY_PATTERNS = OVERLAY_PATTERNS;
+  protected readonly POSITION_PATTERNS = POSITION_PATTERNS;
+  protected readonly SCALE_PATTERNS = SCALE_PATTERNS;
+  protected readonly COLOR_PATTERNS = COLOR_PATTERNS;
+  protected readonly OPACITY_PATTERNS = OPACITY_PATTERNS;
+  protected readonly GENERATE_PATTERNS = GENERATE_PATTERNS;
+  protected readonly PARENT_IMAGE_PATTERNS = PARENT_IMAGE_PATTERNS;
+  protected readonly CONTROL_INSTRUCTION_PATTERNS = CONTROL_INSTRUCTION_PATTERNS;
+  protected readonly TEXT_PATTERNS = TEXT_PATTERNS;
+  protected readonly TEXT_POSITION_PATTERNS = TEXT_POSITION_PATTERNS;
+  protected readonly TEXT_SIZE_PATTERNS = TEXT_SIZE_PATTERNS;
+  protected readonly TEXT_COLOR_PATTERNS = TEXT_COLOR_PATTERNS;
+  protected readonly TEXT_STYLE_PATTERNS = TEXT_STYLE_PATTERNS;
+  protected readonly PROMPT_SECTION_PATTERN = PROMPT_SECTION_PATTERN;
+  protected readonly OVERLAY_SECTION_PATTERN = OVERLAY_SECTION_PATTERN;
+  protected readonly TEXT_SECTION_PATTERN = TEXT_SECTION_PATTERN;
+  protected readonly PROMPT_ALT_PATTERN = PROMPT_ALT_PATTERN;
+  protected readonly OVERLAY_ALT_PATTERN = OVERLAY_ALT_PATTERN;
+  protected readonly TEXT_ALT_PATTERN = TEXT_ALT_PATTERN;
+  protected readonly CAPTION_PATTERN = CAPTION_PATTERN;
+  protected readonly WOWOW_PATTERN = WOWOW_PATTERN;
 
   protected overlayKeywords = [...OVERLAY_KEYWORDS];
 

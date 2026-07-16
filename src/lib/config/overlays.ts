@@ -1,6 +1,7 @@
 /**
  * Shared overlay configuration — single source of truth
- * Replaces scattered OverlayMode type, URL maps, and keyword lists
+ * Replaces scattered OverlayMode type, URL maps, and keyword lists.
+ * Asset URLs derive from APP_URL (lib/env) so there is one canonical host.
  */
 
 // --- Overlay Mode Type (was in ImageOverlay.tsx, imported by server code) ---
@@ -53,10 +54,8 @@ export const AI_TRANSFORM_MODES: readonly OverlayMode[] = ["ghiblify"] as const;
 
 // --- Overlay URL Configuration ---
 
-const BASE_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://wowowifyer.vercel.app"
-    : "";
+import { APP_URL, IS_PRODUCTION } from "@/lib/env";
+const BASE_URL = IS_PRODUCTION ? APP_URL : "";
 
 export const OVERLAY_URLS: Record<string, string> = {
   degenify: `${BASE_URL}/degen/degenify.png`,
@@ -114,8 +113,25 @@ export const DEFAULT_OVERLAY_PROMPTS: Record<string, string> = {
   baseify: "a blockchain themed background",
   dickbuttify: "a meme-worthy background",
   mantleify: "a digital landscape with mountains",
+  higherise: "a motivational landscape with rising peaks",
+  nikefy: "a dynamic sports-themed background",
+  nounify: "a playful colorful background with glasses motif",
+  clankerify: "a digital token-themed background",
   ghiblify: "a serene natural landscape",
 };
+
+/** Validate that an overlay mode string is supported. Throws on invalid values. */
+export function validateOverlayMode(overlayMode?: string): void {
+  if (
+    overlayMode !== undefined &&
+    overlayMode !== "wowowify" &&
+    !OVERLAY_KEYWORDS.includes(overlayMode)
+  ) {
+    throw new Error(
+      `Invalid overlay mode: ${overlayMode}. Supported modes are: ${OVERLAY_KEYWORDS.join(", ")}.`
+    );
+  }
+}
 
 // Color theme per overlay mode (for UI styling)
 export const OVERLAY_COLORS: Record<

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { ethers } from "ethers";
+import { logger } from "@/lib/logger";
 
 // HigherBaseOriginals contract ABI (just the functions we need)
 const CONTRACT_ABI = [
@@ -70,7 +71,7 @@ export default function BaseNFTGallery() {
         const items: NFTItem[] = [];
 
         // Use the direct approach to get tokens by iterating through IDs
-        console.log("Fetching tokens by iterating through IDs");
+        logger.info("BaseNFTGallery: fetching tokens by iterating through IDs");
 
         // Start from token ID 1 and go up to check for all minted tokens
         // We'll limit to checking the first 20 possible tokens for efficiency
@@ -79,23 +80,30 @@ export default function BaseNFTGallery() {
         for (let i = 1; i <= maxTokensToCheck; i++) {
           try {
             const tokenId = i.toString();
-            console.log(`Checking token ID ${tokenId}...`);
+            logger.info("BaseNFTGallery: checking token", { tokenId });
 
             // Check if this token exists by trying to get its owner
             const owner = await contract.ownerOf(tokenId);
-            console.log(`Token ${tokenId} exists, owner:`, owner);
+            // Privacy: log only truncated owner address (matches the verified CollectionCard display style).
+            logger.info("BaseNFTGallery: token owner", {
+              tokenId,
+              ownerPrefix: owner.substring(0, 6),
+              ownerSuffix: owner.substring(owner.length - 4),
+            });
 
             // Get the token URI
             const tokenURI = await contract.tokenURI(tokenId);
-            console.log(`Token ${tokenId} URI:`, tokenURI);
+            logger.info("BaseNFTGallery: token URI", {
+              tokenId,
+              tokenURI: String(tokenURI),
+            });
 
             // Get the overlay type
-            const overlayType = await contract.overlayTypes(tokenId);
-            console.log(
-              `Token ${tokenId} overlay type:`,
-              overlayType,
-              getOverlayTypeName(Number(overlayType))
-            );
+            const overlayType = await contract.overlayTypes(tokenId);              logger.info("BaseNFTGallery: token overlay type", {
+                tokenId,
+                overlayType: String(overlayType),
+                overlayName: getOverlayTypeName(Number(overlayType)),
+              });
 
             // Extract the Grove URL from the tokenURI if possible
             let groveUrl = "";
@@ -105,22 +113,23 @@ export default function BaseNFTGallery() {
               const overlayName = getOverlayTypeName(
                 Number(overlayType)
               ).toLowerCase();
-              console.log(`Token ${tokenId} overlay name:`, overlayName);
+              logger.info("BaseNFTGallery: token overlay name", { tokenId, overlayName });
 
               // Try to extract the prefix from the tokenURI
               const match = tokenURI.match(/^ipfs:\/\/([^\/]+)\//);
               if (match && match[1]) {
                 const prefix = match[1];
-                console.log(`Token ${tokenId} has prefix:`, prefix);
+                logger.info("BaseNFTGallery: token URI prefix", { tokenId, prefix });
 
                 try {
                   groveUrl = decodeURIComponent(
                     tokenURI.replace(`ipfs://${prefix}/`, "")
                   );
-                  console.log(
-                    `Extracted Grove URL for token ${tokenId} from ${prefix} format:`,
-                    groveUrl
-                  );
+                  logger.info("BaseNFTGallery: extracted grove URL", {
+                    tokenId,
+                    prefix,
+                    groveUrlPresent: Boolean(groveUrl),
+                  });
                 } catch (decodeError) {
                   console.warn(
                     `Could not decode URI for token ${tokenId}:`,

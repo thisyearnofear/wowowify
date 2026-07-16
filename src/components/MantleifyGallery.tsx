@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { ethers } from "ethers";
+import { logger } from "@/lib/logger";
 
 // MantleifyNFT contract ABI (just the functions we need)
 const CONTRACT_ABI = [
@@ -56,7 +57,7 @@ export default function MantleifyGallery() {
           const tokenCounter = await contract._tokenIds();
           if (tokenCounter) {
             maxTokenId = Number(tokenCounter);
-            console.log("Current token counter:", maxTokenId);
+            logger.info("MantleifyGallery: current token counter", { maxTokenId });
           }
         } catch (error) {
           console.warn(
@@ -79,7 +80,7 @@ export default function MantleifyGallery() {
 
             // Get the token URI
             const tokenURI = await contract.tokenURI(tokenId);
-            console.log(`Token ${tokenId} URI:`, tokenURI);
+            logger.info("MantleifyGallery: token URI", { tokenId, tokenURI: String(tokenURI) });
 
             // Extract the Grove URL from the tokenURI if possible
             let groveUrl = "";
@@ -90,11 +91,10 @@ export default function MantleifyGallery() {
                 // New format: ipfs://mantleify/encodedGroveUrl
                 groveUrl = decodeURIComponent(
                   tokenURI.replace("ipfs://mantleify/", "")
-                );
-                console.log(
-                  `Extracted Grove URL for token ${tokenId}:`,
-                  groveUrl
-                );
+                );                  logger.info("MantleifyGallery: extracted grove URL", {
+                    tokenId,
+                    groveUrlPresent: Boolean(groveUrl),
+                  });
               } catch (decodeError) {
                 console.warn(
                   `Could not decode URI for token ${tokenId}:`,
@@ -104,9 +104,7 @@ export default function MantleifyGallery() {
             } else if (tokenURI && tokenURI.startsWith("ipfs://placeholder/")) {
               // Old format: We don't have the Grove URL in the tokenURI
               // We'll need to use a placeholder image
-              console.log(
-                `Token ${tokenId} uses old format without Grove URL in tokenURI`
-              );
+            logger.info("MantleifyGallery: token uses old format without grove URL", { tokenId });
             }
 
             // Use the Grove URL as the image URL, or fall back to a placeholder

@@ -3,18 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import Navigation from "@/components/Navigation";
 import Image from "next/image";
-import { Web3Provider } from "@/components/Web3Provider";
 import WalletConnect from "@/components/WalletConnect";
 import { ImageRecord } from "@/lib/metrics";
 import BaseNFTGallery from "@/components/BaseNFTGallery";
 import L2NFTGallery from "@/components/L2NFTGallery";
-
-/**
- * Admin password — set NEXT_PUBLIC_ADMIN_PASSWORD env var; defaults to "wowowify" for dev.
- * NOTE: This is client-side-only auth (a mild UI deterrent). The password is visible
- * in the JS bundle. For proper security, add server-side middleware or API validation.
- */
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "wowowify";
 
 function AdminContent() {
   // --- Auth state (must be declared before any conditional return) ---
@@ -28,13 +20,22 @@ function AdminContent() {
   const [error, setError] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      setAuthError("");
-    } else {
-      setAuthError("Incorrect password");
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+        setAuthError("");
+      } else {
+        setAuthError("Incorrect password");
+      }
+    } catch {
+      setAuthError("Authentication failed");
     }
   };
 
@@ -237,9 +238,5 @@ function AdminContent() {
 }
 
 export default function AdminPage() {
-  return (
-    <Web3Provider>
-      <AdminContent />
-    </Web3Provider>
-  );
+  return <AdminContent />;
 }

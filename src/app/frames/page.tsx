@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Providers } from "@/components/providers/Providers";
 
+// Web3Provider + ToastContainer are now composed by ClientRoot in the root
+// layout, so this page no longer needs its own providers wrapper.
 // Dynamically import components that need to be client-side only
 const FrameContent = dynamic(() => import("./FrameContent"), {
   ssr: false,
@@ -13,10 +14,8 @@ const FrameContent = dynamic(() => import("./FrameContent"), {
 
 export default function FramePage() {
   return (
-    <Providers>
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-900">
-        <FrameContent />
-      </div>
-    </Providers>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-900">
+      <FrameContent />
+    </div>
   );
 }

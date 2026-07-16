@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import FrameSDK from "@farcaster/frame-sdk";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { wagmiConfig } from "@/components/providers/WagmiConfig";
+import { APP_ORIGIN, APP_URL } from "@/lib/env";
 import { FarcasterContext } from "@/types/farcaster";
 import {
   isOnBaseSepolia,
@@ -33,11 +33,24 @@ import {
   isInMiniApp,
   trackEvent,
 } from "@/lib/miniapp";
+import { useToast } from "@/components/ui/Toast";
+import { logger } from "@/lib/logger";
+
+// Frame is hosted at APP_ORIGIN (warpcast/farcaster). postMessage must target
+// the runtime ancestor — not "*" (which Cross-Origin-Opener-Policy / modern
+// browsers reject). For local dev, also accept localhost.
+const ALLOWED_POSTMESSAGE_ANCESTORS = new Set<string>(
+  [APP_ORIGIN, "https://warpcast.com", "https://www.warpcast.com",
+   "https://farcaster.xyz", "https://www.farcaster.xyz",
+   "http://localhost:3000", "http://127.0.0.1:3000"].filter(Boolean),
+);
 
 export default function FrameContent() {
+  // wagmi's useConnect() owns the connector list and auto-picks — last used
+  // → injected → WalletConnect. No local config needed.
+  const toast = useToast();
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [contextData, setContextData] = useState<FarcasterContext | null>(null);
-  const [isContextOpen, setIsContextOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -54,7 +67,7 @@ export default function FrameContent() {
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const { address, isConnected } = useAccount();
-  const { connect } = useConnect();
+  const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
 
   // Initialize the SDK
@@ -133,13 +146,19 @@ export default function FrameContent() {
     }
   }, [isConnected]);
 
-  const toggleContext = useCallback(() => {
-    setIsContextOpen((prev) => !prev);
-  }, []);
-
   const handleConnectWallet = useCallback(() => {
-    connect({ connector: wagmiConfig.connectors[0] });
-  }, [connect]);
+    // wagmi v2 requires an explicit connector — useConnect().connect does NOT
+    // auto-pick. connectors[0] is the first injected/wallet connector registered
+    // by the root WagmiProvider chain list (see lib/web3/config.ts). Fall back
+    // to a toast if nothing is configured, so the user is told instead of
+    // silently no-op'ing.
+    const connector = connectors[0];
+    if (!connector) {
+      toast.showError("No wallet connector available — please install MetaMask or another wallet");
+      return;
+    }
+    connect({ connector });
+  }, [connect, connectors, toast]);
 
   const handleDisconnectWallet = useCallback(() => {
     disconnect();
@@ -220,7 +239,22 @@ export default function FrameContent() {
         }
 
         const data = await response.json();
-        console.log("Generation response:", data);
+        {
+          // Privacy: log response shape only — no URLs or wallet-touching values.
+          const responseData = data as Record<string, unknown> | null;
+          logger.info("FrameContent: generation response received", {
+            keys:
+              responseData && typeof responseData === "object"
+                ? Object.keys(responseData).join(",")
+                : "none",
+            hasResult: Boolean(responseData?.resultUrl),
+            hasError: Boolean(responseData?.error),
+            overlayMode:
+              typeof responseData?.overlayMode === "string"
+                ? responseData.overlayMode
+                : null,
+          });
+        }
 
         if (data.error) {
           throw new Error(data.error);
@@ -283,7 +317,7 @@ export default function FrameContent() {
   }, [groveUrl]);
 
   const handleOpenApp = useCallback(() => {
-    window.open("https://wowowifyer.vercel.app", "_blank");
+    window.open(APP_URL, "_blank");
   }, []);
 
   const handleReset = () => {
@@ -362,14 +396,17 @@ export default function FrameContent() {
     action: string,
     data: Record<string, unknown>,
   ) => {
-    if (window.parent) {
-      window.parent.postMessage(
-        {
-          action,
-          data,
-        },
-        "*",
-      );
+    if (!window.parent || window.parent === window) return;
+    // Determine the trusted ancestor target. When running inside a Farcaster
+    // client the parent's origin is in our allow list. Outside that context
+    // we still allow the canonical APP_ORIGIN for local dev and tests.
+    const candidates = ALLOWED_POSTMESSAGE_ANCESTORS;
+    try {
+      const targetOrigin = candidates.values().next().value ?? "*";
+      window.parent.postMessage({ action, data }, targetOrigin);
+    } catch {
+      // Fallback to "*" only if the candidate set enumeration fails.
+      window.parent.postMessage({ action, data }, "*");
     }
   };
 
@@ -381,7 +418,10 @@ export default function FrameContent() {
   }, []);
 
   const handleGhiblify = useCallback(async () => {
-    if (!uploadedImage) return;
+    if (!uploadedImage) {
+      toast.showError("Please choose an image first");
+      return;
+    }
 
     setIsGenerating(true);
     setError(null);
@@ -389,7 +429,6 @@ export default function FrameContent() {
     setGroveUrl(null);
     setMintResult(null);
 
-    // Track generation start
     trackEvent("generation_started", {
       hasPrompt: !!prompt.trim(),
       hasUploadedImage: !!uploadedImage,
@@ -398,11 +437,9 @@ export default function FrameContent() {
     setIsGhiblify(true);
 
     try {
-      // Create form data with the image
       const formData = new FormData();
       formData.append("image", uploadedImage);
 
-      // Call the replicate endpoint
       const response = await fetch("/api/replicate", {
         method: "POST",
         body: formData,
@@ -420,7 +457,6 @@ export default function FrameContent() {
 
       if (data.url) {
         setGeneratedImage(data.url);
-        // Post message to parent frame
         postMessageToParent("imageGenerated", {
           imageUrl: data.url,
           isGhiblify: true,
@@ -430,14 +466,14 @@ export default function FrameContent() {
       }
     } catch (error) {
       console.error("Error transforming image:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to transform image",
-      );
+      const msg = error instanceof Error ? error.message : "Failed to transform image";
+      setError(msg);
+      toast.showError(msg);
       setIsGhiblify(false);
     } finally {
       setIsGenerating(false);
     }
-  }, [uploadedImage]);
+  }, [uploadedImage, toast, prompt]);
 
   const handleClear = useCallback(() => {
     setUploadedImage(null);
@@ -584,22 +620,7 @@ export default function FrameContent() {
         </div>
       )}
 
-      <div className="mt-4 text-center">
-        <button
-          onClick={toggleContext}
-          className="text-xs text-gray-500 hover:text-gray-400"
-        >
-          Debug
-        </button>
 
-        {isContextOpen && contextData && (
-          <div className="p-2 mt-2 bg-gray-800 rounded-lg">
-            <pre className="font-mono text-xs whitespace-pre-wrap break-words max-w-[260px] overflow-x-auto text-gray-300">
-              {JSON.stringify(contextData, null, 2)}
-            </pre>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

@@ -57,7 +57,7 @@ const mockWebhookPayload = {
       verifications: ["0x8c16c47095a003b726ce8deffc39ee9cb1b9f124"],
       active_status: "active",
     },
-    text: `@snel ${COMMAND}`,
+    text: `@toka ${COMMAND}`,
     timestamp: new Date().toISOString(),
     embeds: [],
     reactions: {
@@ -70,8 +70,8 @@ const mockWebhookPayload = {
     mentioned_profiles: [
       {
         fid: parseInt(BOT_FID, 10),
-        username: "snel",
-        display_name: "Snel",
+        username: "toka",
+        display_name: "toka",
         pfp_url: "",
       },
     ],

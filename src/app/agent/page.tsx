@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Navigation from "@/components/Navigation";
 import Image from "next/image";
-import { Web3Provider } from "@/components/Web3Provider";
 import WalletConnect from "@/components/WalletConnect";
 import { useAccount } from "wagmi";
 import MintMantleifyButton from "@/components/MintMantleifyButton";
 import MintBaseNFTButton from "@/components/MintBaseNFTButton";
 import MintScrollifyNFTButton from "@/components/MintScrollifyNFTButton";
+import { useToast } from "@/components/ui/Toast";
 
 // Loading indicator component
 const LoadingIndicator = () => (
@@ -54,7 +55,7 @@ interface CommandResult {
   groveUrl?: string;
 }
 
-// Main component wrapped with Web3Provider
+// Main component — reads ?cmd= via useSearchParams (Suspense-safe)
 function AgentContent() {
   const [command, setCommand] = useState("");
   const [result, setResult] = useState<CommandResult | null>(null);
@@ -65,17 +66,23 @@ function AgentContent() {
   );
   const [showConfirmation, setShowConfirmation] = useState(false);
   const { isConnected } = useAccount();
+  const toast = useToast();
+  const searchParams = useSearchParams();
 
-  // Check if URL has a command parameter
-  useState(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const cmdParam = params.get("cmd");
-      if (cmdParam) {
+  // Hydration-safe: read ?cmd= AFTER mount so SSR doesn't try to peek window.
+  useEffect(() => {
+    const cmdParam = searchParams?.get("cmd");
+    if (cmdParam) {
+      try {
         setCommand(decodeURIComponent(cmdParam));
+      } catch {
+        // Malformed encoding — fall back to the raw value rather than crash.
+        setCommand(cmdParam);
+        toast.showError("Command in URL was malformed");
       }
     }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Function to proxy image URLs if needed
   const getProxiedUrl = (url: string): string => {
@@ -515,9 +522,11 @@ function AgentContent() {
 }
 
 export default function AgentPage() {
+  // Suspense boundary is REQUIRED for useSearchParams in Next.js 15 —
+  // without it, the entire page bails to client-side rendering.
   return (
-    <Web3Provider>
+    <Suspense fallback={<LoadingIndicator />}>
       <AgentContent />
-    </Web3Provider>
+    </Suspense>
   );
 }

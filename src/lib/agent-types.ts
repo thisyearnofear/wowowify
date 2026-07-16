@@ -36,6 +36,14 @@ export interface AgentResponse {
   error?: string;
   groveUri?: string;
   groveUrl?: string;
+  /**
+   * For async predictions (e.g. ghiblify): the URL the browser should poll
+   * until status === "completed". Replaces the old server-side polling that
+   * used to overrun Vercel's function timeout.
+   */
+  pollUrl?: string;
+  /** Human-readable status message accompanying `status === "processing"` */
+  message?: string;
 }
 
 export interface ParsedCommand {

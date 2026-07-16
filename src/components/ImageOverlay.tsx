@@ -10,6 +10,7 @@ import {
   PRESET_OVERLAY_PATHS,
   AI_TRANSFORM_MODES,
 } from "@/lib/config/overlays";
+import { useToast } from "./ui/Toast";
 
 // Re-export for backward compatibility with components that import from here
 export type { OverlayMode } from "@/lib/config/overlays";
@@ -24,7 +25,47 @@ interface OverlayControls {
 
 export type Stage = "initial" | "style" | "adjust";
 
+/** Word-wrap text into lines that fit within maxWidth on the given canvas context */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = words[0] || "";
+
+  for (let i = 1; i < words.length; i++) {
+    const testLine = `${currentLine} ${words[i]}`;
+    if (ctx.measureText(testLine).width > maxWidth) {
+      lines.push(currentLine);
+      currentLine = words[i];
+    } else {
+      currentLine = testLine;
+    }
+  }
+  lines.push(currentLine);
+  return lines;
+}
+
 export default function ImageOverlay() {
+  const toast = useToast();
+  // Tracks every URL.createObjectURL we mint so we can revoke on unmount,
+  // on preset swap, and on "start over". Previously the cleanup-return-
+  // from-handler anti-pattern caused leaks across mode switches.
+  const activeObjectUrlsRef = useRef<Set<string>>(new Set());
+
+  const trackObjectUrl = useCallback((url: string) => {
+    activeObjectUrlsRef.current.add(url);
+    return url;
+  }, []);
+
+  const revokeAllObjectUrls = useCallback(() => {
+    const urls = activeObjectUrlsRef.current;
+    urls.forEach((url) => URL.revokeObjectURL(url));
+    urls.clear();
+  }, []);
+
+  useEffect(() => {
+    return () => revokeAllObjectUrls();
+  }, [revokeAllObjectUrls]);
+
   const [baseImage, setBaseImage] = useState<File | null>(null);
   const [overlayImage, setOverlayImage] = useState<File | null>(null);
   const [basePreviewUrl, setBasePreviewUrl] = useState<string>("");
@@ -44,16 +85,22 @@ export default function ImageOverlay() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [stage, setStage] = useState<Stage>("initial");
+  const [textControls, setTextControls] = useState({
+    content: "",
+    position: "bottom",
+    fontSize: 48,
+    color: "white",
+    style: "bold",
+  });
 
   const handleBaseImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setBaseImage(file);
-      const url = URL.createObjectURL(file);
-      setBasePreviewUrl(url);
-      setStage("style");
-      return () => URL.revokeObjectURL(url);
-    }
+    if (!file) return;
+    // Old preset's preview URLs from the prior stage are revoked when the
+    // user returns to "style" / "initial" via handleBack / onStartOver.
+    setBaseImage(file);
+    setBasePreviewUrl(trackObjectUrl(URL.createObjectURL(file)));
+    setStage("style");
   };
 
   const loadPresetOverlay = async (presetMode: OverlayMode) => {
@@ -62,7 +109,7 @@ export default function ImageOverlay() {
     // For AI transforms, we don't need a preset overlay image
     if (AI_TRANSFORM_MODES.includes(presetMode)) {
       if (!baseImage || !basePreviewUrl) {
-        alert("Please upload an image first");
+        toast.showError("Please upload an image first");
         return;
       }
 
@@ -70,7 +117,6 @@ export default function ImageOverlay() {
       setStage("adjust");
 
       try {
-        // Convert base image to blob
         const imageBlob = await fetch(basePreviewUrl).then((r) => r.blob());
         const formData = new FormData();
         formData.append("image", imageBlob, "image.png");
@@ -91,22 +137,19 @@ export default function ImageOverlay() {
         }
 
         if (result.url) {
-          // Fetch the transformed image and create a local URL
           const transformedImageResponse = await fetch(result.url);
           const transformedImageBlob = await transformedImageResponse.blob();
-          const transformedImageUrl = URL.createObjectURL(transformedImageBlob);
-          setCombinedPreviewUrl(transformedImageUrl);
+          setCombinedPreviewUrl(trackObjectUrl(URL.createObjectURL(transformedImageBlob)));
         } else {
           throw new Error("No transformed image URL received");
         }
       } catch (error) {
         console.error("Error transforming image:", error);
-        alert(
+        toast.showError(
           error instanceof Error
             ? error.message
-            : "Failed to transform image. Please try again."
+            : "Failed to transform image. Please try again.",
         );
-        // Reset state on error
         setMode("wowowify");
         setStage("style");
       } finally {
@@ -115,7 +158,6 @@ export default function ImageOverlay() {
       return;
     }
 
-    // Wowowify = no overlay stamp, just apply the color tint + go to adjust stage
     if (presetMode === "wowowify") {
       setOverlayImage(null);
       setOverlayPreviewUrl("");
@@ -135,10 +177,9 @@ export default function ImageOverlay() {
           type: "image/png",
         });
 
-        // Handle SVG conversion if needed
         const handleOverlayFile = async (file: File) => {
           if (file.type === "image/svg+xml") {
-            const svgUrl = URL.createObjectURL(file);
+            const svgUrl = trackObjectUrl(URL.createObjectURL(file));
             const img = new Image();
             img.src = svgUrl;
             await new Promise((resolve, reject) => {
@@ -153,7 +194,9 @@ export default function ImageOverlay() {
             if (!ctx) throw new Error("Could not get canvas context");
 
             ctx.drawImage(img, 0, 0);
+            // SVG object URL no longer needed once pixels are rasterized
             URL.revokeObjectURL(svgUrl);
+            activeObjectUrlsRef.current.delete(svgUrl);
 
             const pngUrl = canvas.toDataURL("image/png");
             const response = await fetch(pngUrl);
@@ -171,12 +214,11 @@ export default function ImageOverlay() {
 
         const processedFile = await handleOverlayFile(file);
         setOverlayImage(processedFile);
-        const url = URL.createObjectURL(processedFile);
-        setOverlayPreviewUrl(url);
+        setOverlayPreviewUrl(trackObjectUrl(URL.createObjectURL(processedFile)));
         setStage("adjust");
-        return () => URL.revokeObjectURL(url);
       } catch (error) {
         console.error("Error loading preset overlay:", error);
+        toast.showError("Failed to load that overlay");
       }
     }
   };
@@ -238,6 +280,56 @@ export default function ImageOverlay() {
           ctx.drawImage(overlayImg, x, y, scaledWidth, scaledHeight);
         }
 
+        // Draw text overlay if content is provided
+        if (textControls.content) {
+          const fontSize = textControls.fontSize;
+          const fontWeight = textControls.style === "bold" ? "bold" : "normal";
+          const fontFamily =
+            textControls.style === "monospace"
+              ? "RobotoMono, monospace"
+              : textControls.style === "serif"
+              ? "serif"
+              : "Roboto, sans-serif";
+
+          ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+          ctx.fillStyle = textControls.color;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          // Add stroke for readability
+          ctx.strokeStyle = textControls.color === "white" ? "black" : "white";
+          ctx.lineWidth = Math.max(2, fontSize / 16);
+
+          // Calculate position based on textControls.position
+          let textX = canvas.width / 2;
+          let textY = canvas.height / 2;
+          const margin = fontSize * 0.8;
+
+          const pos = textControls.position.toLowerCase();
+          if (pos === "top") { textY = margin; }
+          else if (pos === "bottom") { textY = canvas.height - margin; }
+          else if (pos === "top-left") { textX = margin; textY = margin; ctx.textAlign = "left"; }
+          else if (pos === "top-right") { textX = canvas.width - margin; textY = margin; ctx.textAlign = "right"; }
+          else if (pos === "bottom-left") { textX = margin; textY = canvas.height - margin; ctx.textAlign = "left"; }
+          else if (pos === "bottom-right") { textX = canvas.width - margin; textY = canvas.height - margin; ctx.textAlign = "right"; }
+          else if (pos === "left") { textX = margin; ctx.textAlign = "left"; }
+          else if (pos === "right") { textX = canvas.width - margin; ctx.textAlign = "right"; }
+          // "center" keeps the defaults
+
+          // Handle multi-line text
+          const maxWidth = canvas.width - margin * 2;
+          const lines = wrapText(ctx, textControls.content, maxWidth);
+          const lineHeight = fontSize * 1.2;
+          const totalHeight = lines.length * lineHeight;
+          const startY = textY - totalHeight / 2 + lineHeight / 2;
+
+          for (let i = 0; i < lines.length; i++) {
+            const ly = startY + i * lineHeight;
+            ctx.strokeText(lines[i], textX, ly);
+            ctx.fillText(lines[i], textX, ly);
+          }
+        }
+
         // Update preview
         setCombinedPreviewUrl(canvas.toDataURL());
       } catch (error) {
@@ -248,7 +340,7 @@ export default function ImageOverlay() {
     const debouncedFn = debounce(combineImages, 16);
     debouncedFn();
     return () => debouncedFn.cancel();
-  }, [baseImage, overlayImage, controls, basePreviewUrl, overlayPreviewUrl]);
+  }, [baseImage, overlayImage, controls, basePreviewUrl, overlayPreviewUrl, textControls]);
 
   useEffect(() => {
     // Run for overlay mode (overlayImage set) OR tint-only mode (wowowify with alpha > 0)
@@ -272,12 +364,13 @@ export default function ImageOverlay() {
       setOverlayPreviewUrl("");
       setStage("style");
     } else if (stage === "style") {
+      // Returning to initial: free every preview URL we've minted so far
+      revokeAllObjectUrls();
       setBaseImage(null);
       setBasePreviewUrl("");
       setCombinedPreviewUrl("");
       setStage("initial");
     }
-    // Always clear generation state when going back
     setGenerationPrompt("");
     setIsGenerating(false);
   };
@@ -299,6 +392,13 @@ export default function ImageOverlay() {
     } else {
       setControls((prev) => ({ ...prev, [key]: value }));
     }
+  };
+
+  const updateTextControl = (
+    key: keyof typeof textControls,
+    value: string | number
+  ) => {
+    setTextControls((prev) => ({ ...prev, [key]: value }));
   };
 
   const generateImage = async () => {
@@ -345,6 +445,9 @@ export default function ImageOverlay() {
       }
     } catch (error) {
       console.error("Error generating image:", error);
+      toast.showError(
+        error instanceof Error ? error.message : "Failed to wowowify",
+      );
       cleanupGenerationState();
     } finally {
       setIsGenerating(false);
@@ -404,13 +507,13 @@ export default function ImageOverlay() {
             </div>
 
             <div className="w-full md:w-64 flex flex-col gap-4">
-              {stage === "style" ? (
-                <StyleStage
+              {stage === "style" ? (                  <StyleStage
                   mode={mode}
                   controls={controls}
                   updateControl={updateControl}
                   loadPresetOverlay={loadPresetOverlay}
                   onStartOver={() => {
+                    revokeAllObjectUrls();
                     setBaseImage(null);
                     setBasePreviewUrl("");
                     setCombinedPreviewUrl("");
@@ -424,7 +527,9 @@ export default function ImageOverlay() {
                   updateControl={updateControl}
                   onDownload={handleDownload}
                   onBack={handleBack}
-                  showControls={mode !== "ghiblify" && mode !== "wowowify"}
+                  showControls={mode !== "ghiblify"}
+                  text={textControls}
+                  updateText={updateTextControl}
                 />
               )}
             </div>

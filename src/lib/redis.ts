@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { logger } from "./logger";
+import { require as requireDefined } from "@/lib/types/guards";
 
 let redisClient: Redis | null = null;
 let connectionAttempts = 0;
@@ -132,7 +133,7 @@ export function getRedisClient(): Redis {
     }
   }
 
-  return redisClient;
+  return requireDefined(redisClient, "redisClient after init");
 }
 
 export async function closeRedisConnection(): Promise<void> {

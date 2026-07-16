@@ -1,5 +1,6 @@
-import { put, head } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { logger } from "./logger";
+import { IS_PRODUCTION } from "./env";
 
 // --- Types ---
 
@@ -9,7 +10,12 @@ interface ImageData {
   createdAt: number;
 }
 
-// --- In-memory fallback (used when BLOB_READ_WRITE_TOKEN is absent) ---
+// --- In-memory fallback (DEV ONLY) ---
+//
+// IMPORTANT: Vercel serverless functions do NOT share memory across
+// cold starts. The in-memory fallback below works for local dev only.
+// In production, BLOB_READ_WRITE_TOKEN must be configured or the caller
+// will get a loud error rather than silent data loss across instances.
 
 const memoryStore = new Map<string, ImageData>();
 
@@ -32,16 +38,18 @@ function cleanupMemoryStore(): void {
   if (deleted > 0) logger.info("Cleaned up old in-memory images", { count: deleted });
 }
 
-// Periodic cleanup only applies to in-memory fallback
-setInterval(cleanupMemoryStore, CLEANUP_INTERVAL_MS);
+// Periodic cleanup only applies in development (production uses Vercel Blob)
+if (!IS_PRODUCTION) {
+  setInterval(cleanupMemoryStore, CLEANUP_INTERVAL_MS);
+}
 
 const hasBlobToken = !!process.env.BLOB_READ_WRITE_TOKEN;
 
 /**
  * Store an image. Uses Vercel Blob when BLOB_READ_WRITE_TOKEN is set,
- * otherwise falls back to in-memory (ephemeral, dev-only).
- *
- * Returns the URL at which the image can be retrieved.
+ * otherwise (dev only) falls back to an in-memory map. In production
+ * without a Blob token we fail loud rather than silently dropping the
+ * image — Vercel function instances don't share memory.
  */
 export async function storeImage(
   id: string,
@@ -59,18 +67,31 @@ export async function storeImage(
       blobUrlMap.set(id, blob.url);
       return blob.url;
     } catch (error) {
-      logger.error("Vercel Blob store failed, falling back to memory", {
+      logger.error("Vercel Blob store failed, falling back to memory (dev only)", {
         error: error instanceof Error ? error.message : String(error),
         id,
       });
-      // Fall through to memory fallback
+      if (IS_PRODUCTION) {
+        // Fail loud — production without durable storage is a real outage.
+        throw new Error(
+          "Image storage unavailable: BLOB_READ_WRITE_TOKEN is set but Vercel Blob write failed.",
+        );
+      }
+      // Fall through to memory fallback (dev only)
     }
+  } else if (IS_PRODUCTION) {
+    throw new Error(
+      "Image storage unavailable: BLOB_READ_WRITE_TOKEN is not configured. " +
+        "Set it in your Vercel project env, or images will be silently lost.",
+    );
   }
 
-  // In-memory fallback
+  // In-memory fallback (DEV ONLY)
   memoryStore.set(id, { buffer, contentType, createdAt: Date.now() });
-  logger.info("Image stored in memory (no blob token)", { id, contentType });
-  // Return a local API URL that serves from memory
+  logger.info("Image stored in memory (no blob token — dev only)", {
+    id,
+    contentType,
+  });
   return `/api/image?id=${id}`;
 }
 

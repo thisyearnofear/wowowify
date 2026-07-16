@@ -93,7 +93,7 @@ export const GenerateModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl p-6 max-w-md w-full">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-xl">
         <div className="flex flex-col gap-6">
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -132,11 +132,11 @@ export const GenerateModal = ({
                 }
               }}
               placeholder="Or describe your image... (max 500 characters)"
-              className="w-full px-4 py-3 border rounded-lg resize-none min-h-[80px] text-sm"
+              className="w-full px-4 py-3 border rounded-lg resize-none min-h-[80px] text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               rows={3}
             />
             <div className="flex items-center justify-between px-1">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
                 {generationPrompt.length}/500 characters
               </span>
               <button
@@ -144,7 +144,7 @@ export const GenerateModal = ({
                 disabled={isGenerating || !generationPrompt}
                 className={`px-6 py-2 rounded-md transition-colors ${
                   isGenerating || !generationPrompt
-                    ? "bg-gray-200 text-gray-500"
+                    ? "bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400"
                     : "bg-violet-600 text-white hover:bg-violet-700"
                 }`}
               >
@@ -155,7 +155,7 @@ export const GenerateModal = ({
 
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors text-sm"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors text-sm"
           >
             Cancel
           </button>

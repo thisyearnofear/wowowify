@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+# wowowify pre-commit hook
+# Runs lint-staged on staged files:
+#   - JS/TS globs → eslint --fix (flat config, single source of truth)
+#   - all staged text files → secretlint (rules preset: aws/gcp/github/privatekey/npm)
+# Fail-fast on either tool's non-zero exit.
+#
+# Bypasses:
+#   - HUSKY=0                → skip whole hook (CI / emergency)
+#   - git commit --no-verify → skip whole hook
+#   - SKIP_LINT_STAGED=1     → skip lint-staged only (rarely needed)
+set -e
+
+if [ "$HUSKY" = "0" ]; then
+  echo "wowowify pre-commit: HUSKY=0, skipping hook"
+  exit 0
+fi
+
+if [ "$SKIP_LINT_STAGED" = "1" ]; then
+  echo "wowowify pre-commit: SKIP_LINT_STAGED=1, skipping lint-staged"
+  exit 0
+fi
+
+# lint-staged will run secretlint + eslint on staged files only,
+# which keeps pre-commit under ~5s on a normal change.
+npx --no-install lint-staged

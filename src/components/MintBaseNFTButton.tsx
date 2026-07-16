@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { encodeFunctionData, parseAbiItem } from "viem";
 import { baseSepolia } from "viem/chains";
+import { logger } from "@/lib/logger";
 
 // Deployed contract address on Base Sepolia
 const CONTRACT_ADDRESS = "0xF90552377071C01B8922c4879eA9E20A39476998";
@@ -256,13 +257,13 @@ export default function MintBaseNFTButton({
           setIsConfirming(false);
         }, 5000);
 
-        console.log("NFT minting transaction sent", {
-          hash,
-          groveUrl,
-          metadataUri,
-          overlayType,
-          overlayTypeEnum,
-          value: priceHex,
+        logger.info("MintBaseNFT: transaction sent", {
+          hash: String(hash),
+          groveUrl: String(groveUrl),
+          metadataUri: String(metadataUri),
+          overlayType: String(overlayType),
+          overlayTypeEnum: Number(overlayTypeEnum),
+          value: String(priceHex),
         });
       } catch (encodeError: unknown) {
         const error = encodeError as EthereumError;
@@ -270,7 +271,7 @@ export default function MintBaseNFTButton({
 
         // Try with alternative ABI as fallback
         try {
-          console.log("Trying alternative ABI format");
+          logger.info("MintBaseNFT: trying alternative ABI format");
 
           const data = encodeFunctionData({
             abi: ALTERNATIVE_ABI,
@@ -306,13 +307,13 @@ export default function MintBaseNFTButton({
             setIsConfirming(false);
           }, 5000);
 
-          console.log("NFT minting transaction sent (using alternative ABI)", {
-            hash,
-            groveUrl,
-            metadataUri,
-            overlayType,
-            overlayTypeEnum,
-            value: priceHex,
+          logger.info("MintBaseNFT: transaction sent (alternative ABI)", {
+            hash: String(hash),
+            groveUrl: String(groveUrl),
+            metadataUri: String(metadataUri),
+            overlayType: String(overlayType),
+            overlayTypeEnum: Number(overlayTypeEnum),
+            value: String(priceHex),
           });
         } catch (fallbackError: unknown) {
           console.error("Error with fallback ABI method:", fallbackError);
@@ -334,8 +335,7 @@ export default function MintBaseNFTButton({
         error.message?.includes("cancelled")
       ) {
         setUserRejected(true);
-        setError("Transaction was rejected. You can try again when ready.");
-        console.log("User rejected the transaction");
+        setError("Transaction was rejected. You can try again when ready.");          logger.info("MintBaseNFT: user rejected transaction");
       } else if (error.message?.includes("Development mode")) {
         // Special handling for development mode issues
         setError(

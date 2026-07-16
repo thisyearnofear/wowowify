@@ -3,6 +3,8 @@
  */
 
 import FrameSDK from "@farcaster/frame-sdk";
+import { APP_URL, APP_ICON_URL } from "./env";
+import { logger } from "./logger";
 
 // Type assertion to help TypeScript
 const frameSDK = FrameSDK as typeof FrameSDK;
@@ -48,7 +50,7 @@ export async function initializeMiniApp() {
     if (isInMiniApp()) {
       // Initialize the frame SDK
       await frameSDK.actions.ready();
-      console.log("Mini App initialized successfully");
+      logger.info("MiniApp: initialized successfully");
       return true;
     }
     return false;
@@ -142,7 +144,14 @@ export function trackEvent(
   try {
     if (isInMiniApp()) {
       // Track event through Mini App context
-      console.log("Mini App Event:", eventName, properties);
+      // Privacy: log event name + properties shape (keys only) — never full property values.
+      logger.info("MiniApp: event tracked", {
+        eventName: String(eventName),
+        propertyKeys:
+          properties && typeof properties === "object"
+            ? Object.keys(properties).join(",")
+            : "none",
+      });
 
       // If client supports custom events, send them
       // Note: frameSDK.context is a Promise, so we'd need to await it
@@ -174,9 +183,6 @@ export function generateEmbedMetadata(
   actionUrl?: string,
   splashImageUrl?: string,
 ) {
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL || "https://wowowify.vercel.app";
-
   return {
     version: "1",
     imageUrl,
@@ -185,8 +191,8 @@ export function generateEmbedMetadata(
       action: {
         type: "launch_frame",
         name: MINIAPP_CONFIG.name,
-        url: actionUrl || `${appUrl}/frames`,
-        splashImageUrl: splashImageUrl || `${appUrl}/wowwowowify.png`,
+        url: actionUrl || `${APP_URL}/frames`,
+        splashImageUrl: splashImageUrl || APP_ICON_URL,
         splashBackgroundColor: "#131313",
       },
     },
@@ -203,8 +209,6 @@ export function createMiniAppMetaTags(
   buttonTitle: string,
   actionUrl?: string,
 ) {
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL || "https://wowowify.vercel.app";
   const embedData = generateEmbedMetadata(imageUrl, buttonTitle, actionUrl);
 
   return {
@@ -238,8 +242,8 @@ export function createMiniAppMetaTags(
       // Additional Mini App metadata
       "fc:miniapp:name": MINIAPP_CONFIG.name,
       "fc:miniapp:description": description,
-      "fc:miniapp:icon": `${appUrl}/wowwowowify.png`,
-      "fc:miniapp:splash": `${appUrl}/wowwowowify.png`,
+      "fc:miniapp:icon": APP_ICON_URL,
+      "fc:miniapp:splash": APP_ICON_URL,
       "fc:miniapp:splash-background": "#131313",
     },
   };

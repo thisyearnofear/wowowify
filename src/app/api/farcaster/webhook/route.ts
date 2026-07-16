@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { NeynarAPIClient } from "@neynar/nodejs-sdk";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { getImageService } from "@/lib/services";
+import { OVERLAY_KEYWORDS, DEFAULT_OVERLAY_PROMPTS } from "@/lib/config/overlays";
+import { APP_URL } from "@/lib/env";
 
 // Mark as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";
@@ -11,7 +13,6 @@ export const dynamic = "force-dynamic";
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY;
 const SIGNER_UUID = process.env.FARCASTER_SIGNER_UUID;
 const BOT_FID = process.env.FARCASTER_BOT_FID;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const WEBHOOK_SECRET = process.env.NEYNAR_WEBHOOK_SECRET;
 
 // Define types for Farcaster profiles
@@ -32,27 +33,18 @@ const getNeynarClient = () => {
 
 // Extract command from mention text
 const extractCommand = (text: string): string => {
-  // Remove @snel or any other mention from the text
+  // Remove @toka or any other mention from the text
   return text.replace(/@\w+/g, "").trim();
 };
 
 // Check if a command is requesting an image generation or overlay
+// Uses OVERLAY_KEYWORDS from shared config instead of hardcoded list
 const isImageGenerationCommand = (command: string): boolean => {
   const lowerCommand = command.toLowerCase();
 
-  // Check for overlay mode keywords
+  // Check for overlay mode keywords (from shared config)
   const hasOverlayKeyword =
-    lowerCommand.includes("degenify") ||
-    lowerCommand.includes("higherify") ||
-    lowerCommand.includes("scrollify") ||
-    lowerCommand.includes("lensify") ||
-    lowerCommand.includes("higherise") ||
-    lowerCommand.includes("dickbuttify") ||
-    lowerCommand.includes("nikefy") ||
-    lowerCommand.includes("nounify") ||
-    lowerCommand.includes("baseify") ||
-    lowerCommand.includes("clankerify") ||
-    lowerCommand.includes("mantleify") ||
+    OVERLAY_KEYWORDS.some((kw) => lowerCommand.includes(kw)) ||
     lowerCommand.includes("overlay");
 
   // Check for generation keywords
@@ -86,25 +78,11 @@ const isImageGenerationCommand = (command: string): boolean => {
 
   // If it's just a text command with no other content, it's likely a text-only overlay
   if (hasTextCommand) {
-    // Check if the command is mostly just text parameters
     const cleanedCommand = command
-      .replace(/--text\s+"[^"]+"/gi, "")
-      .replace(/--text\s+'[^']+'/gi, "")
-      .replace(/--text\s+[^,\.\s][^,\.]+/gi, "")
-      .replace(/--text-position\s+\w+/gi, "")
-      .replace(/--text-size\s+\d+/gi, "")
-      .replace(/--text-color\s+\w+/gi, "")
-      .replace(/--text-style\s+\w+/gi, "")
-      .replace(/--caption\s+"[^"]+"/gi, "")
-      .replace(/--caption\s+'[^']*'/gi, "")
-      .replace(/--caption\s+[^,\.\s][^,\.]+/gi, "")
-      .replace(/--caption-position\s+\w+/gi, "")
-      .replace(/--caption-size\s+\d+/gi, "")
-      .replace(/--caption-color\s+\w+/gi, "")
-      .replace(/--caption-style\s+\w+/gi, "")
+      .replace(/--(?:text|caption)\s+(?:"[^"]+"|'[^']+'|[^,\.\s][^,\.]+)/gi, "")
+      .replace(/--(?:text|caption)-(?:position|size|color|style)\s+[^\s]+/gi, "")
       .trim();
 
-    // If there's not much left after removing text parameters, it's a text-only command
     if (cleanedCommand.length < 10) {
       logger.info("Detected text-only command", { command, cleanedCommand });
       return true;
@@ -265,12 +243,19 @@ const verifyWebhookSignature = (
     hmac.update(rawBody);
     const generatedSignature = hmac.digest("hex");
 
-    const isValid = generatedSignature === signature;
+    // timingSafeEqual requires equal-length buffers — pad/truncate to match.
+    // Length leaks are tolerable here (always 128 hex chars for SHA-512).
+    const expected = Buffer.from(generatedSignature, "hex");
+    const received = Buffer.from(signature, "hex");
+    const isValid =
+      expected.length === received.length &&
+      timingSafeEqual(expected, received);
 
     if (!isValid) {
       logger.error("Invalid webhook signature", {
-        receivedSignature: signature,
-        generatedSignature,
+        // Don't log the full received signature in production to avoid log injection
+        receivedLength: signature.length,
+        expectedLength: generatedSignature.length,
       });
     }
 
@@ -283,47 +268,30 @@ const verifyWebhookSignature = (
   }
 };
 
-// Process the command
+// Process the command — delegates parsing to ImageService, then applies
+// Farcaster-specific post-processing (generation detection, text-only handling)
 async function processCommand(commandText: string) {
-  // Get the appropriate service for Farcaster interface
   const imageService = getImageService("farcaster");
 
-  // Log the raw command for debugging
   logger.info("Processing raw Farcaster command", { commandText });
 
-  // Check if this is explicitly a generation command before parsing
+  // Detect generation patterns before parsing (Farcaster-specific heuristics)
   const isExplicitGenerationCommand =
     /^(generate|create|make|draw)\s+/i.test(commandText.trim()) ||
     /^(a|an)\s+(image|picture|photo)\s+of\s+/i.test(commandText.trim());
 
-  // Check if this is a command that starts with an overlay name followed by "a" or "an" and a noun
-  // Example: "dickbuttify a pyramid of apples"
-  const overlayKeywords = [
-    "degenify",
-    "higherify",
-    "scrollify",
-    "lensify",
-    "higherise",
-    "dickbuttify",
-    "nikefy",
-    "nounify",
-    "baseify",
-    "clankerify",
-    "mantleify",
-    "ghiblify",
-  ];
   const overlayFollowedByNoun = new RegExp(
-    `^(${overlayKeywords.join("|")})\\s+(a|an)\\s+\\w+`,
+    `^(${OVERLAY_KEYWORDS.join("|")})\\s+(a|an)\\s+\\w+`,
     "i"
   );
   const isOverlayGenerationCommand = overlayFollowedByNoun.test(
-    commandText.toLowerCase().trim()
+    commandText.trim()
   );
 
-  // Parse the command using our service
+  // Parse using the shared ImageService parser (single source of truth)
   const parsedCommand = imageService.parseCommand(commandText, "farcaster");
 
-  // If it's an explicit generation command or overlay+noun pattern, force the action to be generate
+  // Force generation action for explicit or overlay+noun patterns
   if (isExplicitGenerationCommand || isOverlayGenerationCommand) {
     parsedCommand.action = "generate";
     parsedCommand.useParentImage = false;
@@ -335,19 +303,17 @@ async function processCommand(commandText: string) {
       isOverlayGeneration: isOverlayGenerationCommand,
     });
 
-    // Make sure we have a prompt - if not, extract it from the command
+    // Ensure we have a prompt
     if (!parsedCommand.prompt || parsedCommand.prompt.length < 3) {
-      // Extract prompt from generation command
       let promptMatch;
       if (isExplicitGenerationCommand) {
         promptMatch = commandText.match(
           /^(?:generate|create|make|draw)\s+(?:a|an)?\s*(?:image|picture|photo)?\s*(?:of|with)?\s*(.*)/i
         );
       } else if (isOverlayGenerationCommand) {
-        // Extract prompt from overlay+noun pattern
         promptMatch = commandText.match(
           new RegExp(
-            `^(?:${overlayKeywords.join("|")})\\s+(?:a|an)\\s+(.*?)(?:\\.|$)`,
+            `^(?:${OVERLAY_KEYWORDS.join("|")})\\s+(?:a|an)\\s+(.*?)(?:\\.|$)`,
             "i"
           )
         );
@@ -356,24 +322,21 @@ async function processCommand(commandText: string) {
       if (promptMatch && promptMatch[1]) {
         parsedCommand.prompt = promptMatch[1].trim();
       } else {
-        // Fallback: use the whole command as prompt after removing generation keywords
         parsedCommand.prompt = commandText
           .replace(/^(generate|create|make|draw)\s+/i, "")
           .replace(/^(a|an)\s+(image|picture|photo)\s+of\s+/i, "")
-          .replace(new RegExp(`^(${overlayKeywords.join("|")})\\s+`, "i"), "")
+          .replace(new RegExp(`^(${OVERLAY_KEYWORDS.join("|")})\\s+`, "i"), "")
           .trim();
       }
     }
   }
 
-  // Check if this is a text-only command (has text parameters but no overlay mode)
+  // Text-only commands (text params but no overlay) should use the parent image
   const isTextOnlyCommand =
     parsedCommand.text &&
     !parsedCommand.overlayMode &&
-    !commandText.toLowerCase().includes("generate") &&
-    !commandText.toLowerCase().includes("create");
+    !isExplicitGenerationCommand;
 
-  // If it's a text-only command, ensure we use the parent image
   if (isTextOnlyCommand) {
     parsedCommand.action = "overlay";
     parsedCommand.useParentImage = true;
@@ -384,34 +347,20 @@ async function processCommand(commandText: string) {
     });
   }
 
-  // Check if this is an overlay command without a parent image reference
-  // but also without a descriptive prompt - in this case, it's likely
-  // meant to be a generation command with the overlay applied
+  // Overlay mode without parent image and no descriptive prompt → generate with default
   if (
     parsedCommand.action === "overlay" &&
     parsedCommand.overlayMode &&
     !parsedCommand.useParentImage &&
     (!parsedCommand.prompt || parsedCommand.prompt.length < 10) &&
-    !isOverlayGenerationCommand // Skip if already identified as overlay+noun pattern
+    !isOverlayGenerationCommand
   ) {
-    // This is likely a generation command with an overlay
     parsedCommand.action = "generate";
 
-    // If we don't have a prompt, create a default one based on the overlay
+    // Use shared DEFAULT_OVERLAY_PROMPTS instead of duplicating them here
     if (!parsedCommand.prompt || parsedCommand.prompt.length < 3) {
-      const DEFAULT_PROMPTS: Record<string, string> = {
-        higherify: "a mountain landscape with clear sky",
-        degenify: "a colorful abstract pattern",
-        scrollify: "a minimalist tech background",
-        lensify: "a professional photography background",
-        baseify: "a blockchain themed background",
-        dickbuttify: "a meme-worthy background",
-        mantleify: "a digital landscape with mountains",
-        ghiblify: "a serene natural landscape",
-      };
-      const defaultPrompt = DEFAULT_PROMPTS[parsedCommand.overlayMode] || "a simple background";
-
-      parsedCommand.prompt = defaultPrompt;
+      parsedCommand.prompt =
+        DEFAULT_OVERLAY_PROMPTS[parsedCommand.overlayMode] || "a simple background";
     }
 
     logger.info("Converted overlay command to generation with overlay", {
@@ -476,7 +425,7 @@ export async function POST(request: Request) {
     if (!commandText) {
       await replyToCast(
         castData.hash,
-        "I didn't understand that command. Try something like '@snel lensify a mountain landscape. scale to 0.3.'"
+        "I didn't understand that command. Try something like '@toka lensify a mountain landscape. scale to 0.3.'"
       );
       return NextResponse.json({ status: "error", reason: "Empty command" });
     }
@@ -492,11 +441,11 @@ export async function POST(request: Request) {
 
       await replyToCast(
         castData.hash,
-        "Hi there! I'm Snel, a bot that can generate and modify images. Try commands like:\n\n" +
-          "• '@snel higherify a mountain landscape'\n" +
-          "• '@snel degenify this image' (when replying to a cast with an image)\n" +
-          "• '@snel scrollify a tech background. scale to 0.5'\n" +
-          "• '@snel ghiblify this image' (transform into Ghibli style)\n\n" +
+        "Hi there! I'm @toka, a bot that can generate and modify images. Try commands like:\n\n" +
+          "• '@toka higherify a mountain landscape'\n" +
+          "• '@toka degenify this image' (when replying to a cast with an image)\n" +
+          "• '@toka scrollify a tech background. scale to 0.5'\n" +
+          "• '@toka ghiblify this image' (transform into Ghibli style)\n\n" +
           "Powered by Venice AI & Grove"
       );
 
@@ -616,55 +565,71 @@ export async function POST(request: Request) {
       // Get the image service for Farcaster interface
       const imageService = getImageService("farcaster");
 
-      // Special handling for ghiblify command
+      // Special handling for ghiblify command — fire-and-return pattern.
+      // The slow Replicate poll now happens in the Replicate cloud; we
+      // post "Processing..." and exit immediately. When Replicate completes,
+      // /api/replicate/webhook looks up the cast hash in Redis and posts
+      // the final reply.
       if (commandText.toLowerCase().includes("ghiblify")) {
-        // Set the base image URL in the parsed command if we have one
-        if (imageUrlToUse && parsedCommand.useParentImage) {
-          parsedCommand.baseImageUrl = imageUrlToUse;
-          logger.info("Setting base image URL from cast for ghiblify", {
-            imageUrlToUse,
+        if (!imageUrlToUse) {
+          await replyToCast(
+            castData.hash,
+            "I couldn't find an image to ghiblify. Reply to a cast with an image, or include an image URL.",
+          );
+          return NextResponse.json({
+            status: "error",
+            reason: "No image for ghiblify",
           });
         }
 
-        // Send initial response
         await replyToCast(
           castData.hash,
-          "Processing your image in Ghibli style... This may take a minute or two. I'll reply again when it's ready! 🎨"
+          "Processing your image in Ghibli style... This may take a minute or two. I'll reply again when it's ready! 🎨",
         );
 
-        // Start processing in background
-        (async () => {
-          try {
-            const result = await imageService.processCommand(parsedCommand);
-            if (result.status === "completed" && result.resultUrl) {
-              await replyToCast(
-                castData.hash,
-                "Here's your Ghibli-style image! ✨",
-                result.resultUrl
-              );
-            } else {
-              throw new Error(result.error || "Failed to process image");
-            }
-          } catch (error) {
-            logger.error("Error processing ghiblify command", {
-              error: error instanceof Error ? error.message : String(error),
-              command: commandText,
-            });
-            await replyToCast(
-              castData.hash,
-              formatErrorMessage(
-                error instanceof Error
-                  ? error.message
-                  : "Failed to process image"
-              )
-            );
-          }
-        })();
+        try {
+          const replicateRes = await fetch(`${APP_URL}/api/replicate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: imageUrlToUse,
+              castHash: castData.hash,
+              account: undefined,
+            }),
+          });
 
-        return NextResponse.json({
-          status: "success",
-          reason: "Processing ghiblify command asynchronously",
-        });
+          if (!replicateRes.ok) {
+            const errBody = await replicateRes
+              .json()
+              .catch(() => ({ error: replicateRes.statusText }));
+            throw new Error(errBody.error ?? `Replicate ${replicateRes.status}`);
+          }
+
+          logger.info("Ghibli handoff to Replicate succeeded", {
+            castHash: castData.hash,
+          });
+          return NextResponse.json({
+            status: "success",
+            reason: "Ghiblify handed off to Replicate",
+          });
+        } catch (error) {
+          logger.error("Ghiblify handoff failed", {
+            error: error instanceof Error ? error.message : String(error),
+            castHash: castData.hash,
+          });
+          await replyToCast(
+            castData.hash,
+            formatErrorMessage(
+              error instanceof Error
+                ? error.message
+                : "Failed to start Ghibli processing",
+            ),
+          );
+          return NextResponse.json({
+            status: "error",
+            reason: "Ghiblify handoff failed",
+          });
+        }
       }
 
       // Process other commands synchronously as before

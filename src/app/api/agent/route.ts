@@ -6,12 +6,13 @@ import { incrementTotalRequests, incrementFailedRequests } from "@/lib/metrics";
 import { getRateLimitInfo } from "@/lib/rate-limiter";
 import { ensureFontsAreRegistered } from "@/lib/image-processor";
 import { getImageService, InterfaceType } from "@/lib/services";
+import { validateOverlayMode } from "@/lib/config/overlays";
 
 // Mark the route as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";
 
-// Timeout for image processing
-const TIMEOUT_MS = 30000;
+// Timeout for image processing — 10s to stay within Vercel Hobby (10s) function limit
+const TIMEOUT_MS = 10000;
 
 // Valid API keys for external agents
 const VALID_API_KEYS = {
@@ -24,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    incrementTotalRequests();
+    incrementTotalRequests().catch(() => {});
 
     // Ensure fonts are registered before processing
     await ensureFontsAreRegistered();
@@ -71,7 +72,9 @@ export async function POST(request: Request): Promise<Response> {
     // Always add rate limit headers
     const responseHeaders = {
       "X-RateLimit-Limit": "20",
-      "X-RateLimit-Remaining": rateLimitInfo.remaining?.toString() || "0",
+      // remaining may be undefined when the rate-limiter has no entry yet;
+      // collapse to 0 in that case so the response shape stays a string.
+      "X-RateLimit-Remaining": String(rateLimitInfo.remaining ?? 0),
       "X-RateLimit-Reset": rateLimitInfo.timeToReset.toString(),
     };
 
@@ -81,7 +84,7 @@ export async function POST(request: Request): Promise<Response> {
 
     if (
       !rateLimitInfo.isAllowed &&
-      (!hasValidApiKey || rateLimitInfo.remaining < -50)
+      (!hasValidApiKey || (rateLimitInfo.remaining ?? 0) < -50)
     ) {
       // External agents with valid API keys get 50 extra requests
       logger.warn("Rate limit exceeded", {
@@ -95,7 +98,7 @@ export async function POST(request: Request): Promise<Response> {
             ? "Admin"
             : "Unknown",
       });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         {
           error: `Rate limit exceeded. Try again in ${rateLimitInfo.timeToReset} seconds`,
@@ -178,30 +181,17 @@ export async function POST(request: Request): Promise<Response> {
         parsedCommand.prompt = body.parameters.prompt;
       }
       if (body.parameters.overlayMode) {
-        // Validate overlay mode
-        if (
-          body.parameters.overlayMode === "degenify" ||
-          body.parameters.overlayMode === "higherify" ||
-          body.parameters.overlayMode === "scrollify" ||
-          body.parameters.overlayMode === "lensify" ||
-          body.parameters.overlayMode === "higherise" ||
-          body.parameters.overlayMode === "dickbuttify" ||
-          body.parameters.overlayMode === "nikefy" ||
-          body.parameters.overlayMode === "nounify" ||
-          body.parameters.overlayMode === "baseify" ||
-          body.parameters.overlayMode === "clankerify" ||
-          body.parameters.overlayMode === "mantleify" ||
-          body.parameters.overlayMode === "ghiblify"
-        ) {
+        try {
+          validateOverlayMode(body.parameters.overlayMode);
           parsedCommand.overlayMode = body.parameters.overlayMode;
-        } else {
+        } catch (err) {
           logger.warn("Invalid overlay mode", {
             overlayMode: body.parameters.overlayMode,
             ip,
           });
           return NextResponse.json(
             {
-              error: `Invalid overlay mode: ${body.parameters.overlayMode}. Supported modes are: degenify, higherify, scrollify, lensify, higherise, dickbuttify, nikefy, nounify, baseify, clankerify, mantleify, ghiblify.`,
+              error: err instanceof Error ? err.message : "Invalid overlay mode",
             },
             { status: 400, headers: responseHeaders }
           );
@@ -211,6 +201,12 @@ export async function POST(request: Request): Promise<Response> {
         parsedCommand.controls = {
           ...parsedCommand.controls,
           ...body.parameters.controls,
+        };
+      }
+      if (body.parameters.text) {
+        parsedCommand.text = {
+          ...parsedCommand.text,
+          ...body.parameters.text,
         };
       }
       // If parameters are provided directly, use them as the parsed command
@@ -248,7 +244,7 @@ export async function POST(request: Request): Promise<Response> {
         stack: error instanceof Error ? error.stack : undefined,
         ip,
       });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
 
       return NextResponse.json(
         {
@@ -264,7 +260,7 @@ export async function POST(request: Request): Promise<Response> {
       logger.error("Request processing timed out", {
         error: "Timeout",
       });
-      incrementFailedRequests();
+      incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         {
           status: "failed",
@@ -279,7 +275,7 @@ export async function POST(request: Request): Promise<Response> {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });
-    incrementFailedRequests();
+    incrementFailedRequests().catch(() => {});
 
     return NextResponse.json(
       {

@@ -2,9 +2,9 @@
 
 A Next.js application that provides AI-powered image generation using the Venice AI API, with built-in rate limiting and metrics tracking. It enables image overlays with predefined styles, logos, and filters as well as enabling the user to user their own images as overlays.
 
-## Quick Start Guide for Snel Bot
+## Quick Start Guide for @toka Bot
 
-For a concise guide on how to interact with the Snel bot on Farcaster, see [SNEL_GUIDE.md](./SNEL_GUIDE.md). This guide provides:
+For a concise guide on how to interact with the @toka bot on Farcaster, see [TOKA_GUIDE.md](./docs/TOKA_GUIDE.md). This guide provides:
 
 - Simple command examples for generating images and applying overlays
 - List of all available overlay types
@@ -12,7 +12,7 @@ For a concise guide on how to interact with the Snel bot on Farcaster, see [SNEL
 - Common mistakes to avoid
 - Troubleshooting tips
 
-This quick reference is especially useful for other bots or agents that want to interact with Snel.
+This quick reference is especially useful for other bots or agents that want to interact with @toka.
 
 ## Agent Integration
 
@@ -276,16 +276,25 @@ The application requires the following environment variables:
 
 ```bash
 VENICE_API_KEY=your_venice_api_key
-REDIS_URL=your_redis_url
-BLOB_READ_WRITE_TOKEN=your_vercel_blob_token  # Optional but recommended for production
+UPSTASH_REDIS_REST_URL=your_upstash_redis_rest_url
+UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_token  # Required for production image persistence
+NEYNAR_API_KEY=your_neynar_api_key
+NEYNAR_WEBHOOK_SECRET=your_neynar_webhook_secret
+FARCASTER_BOT_FID=your_bot_fid
+FARCASTER_SIGNER_UUID=your_farcaster_signer_uuid
 NEXT_PUBLIC_ADMIN_PASSWORD=your_admin_password  # Optional, defaults to "wowowify"
+
+# Pre-launch hardening walkthrough: see docs/VERCEL_ENV_CHECKLIST.md.
 ```
 
 You can obtain these from:
 
 - Venice AI API key: [Venice AI Dashboard](https://venice.ai)
-- Redis URL: [Upstash Redis](https://upstash.com)
-- Vercel Blob token: [Vercel Blob Dashboard](https://vercel.com/dashboard/stores) (create a Blob store and copy the read/write token)
+- Upstash Redis REST: [Upstash Console](https://console.upstash.com) — create a Redis DB and copy the REST URL + token
+- Vercel Blob token: [Vercel Blob Dashboard](https://vercel.com/dashboard/stores) — create a Blob store and copy the read/write token
+- Neynar API key: [Neynar Developer Portal](https://neynar.com)
+- Webhook secret: set when configuring webhook URL in Neynar dashboard
 
 ## Getting Started
 
@@ -566,35 +575,35 @@ The bot can process commands when mentioned in a Farcaster cast. It works in two
 
 #### Generating New Images with Overlays
 
-- `@snel Generate a mountain landscape` - Generates a new image with the default overlay (Stable Diffusion)
-- `@snel degenify a futuristic city. scale to 0.5` - Generates an image with the degenify overlay
-- `@snel higherify a beach sunset. opacity to 0.7` - Generates an image with the higherify overlay
-- `@snel scrollify a minimalist tech background. color to blue` - Generates an image with the scrollify overlay
-- `@snel lensify a professional portrait. scale to 0.4` - Generates an image with the lensify overlay
-- `@snel higherise a cityscape. scale to 0.6` - Generates an image with the higherise overlay
-- `@snel dickbuttify a meme template. position at 10, 20` - Generates an image with the dickbuttify overlay
-- `@snel nikefy a sports scene. opacity to 0.8` - Generates an image with the nikefy overlay
-- `@snel nounify a cartoon character. scale to 0.5` - Generates an image with the nounify overlay
-- `@snel baseify a crypto-themed image. color to blue` - Generates an image with the baseify overlay
-- `@snel clankerify a robot scene. scale to 0.7` - Generates an image with the clankerify overlay
-- `@snel mantleify a blockchain visualization. scale to 0.5` - Generates an image with the mantleify overlay
+- `@toka Generate a mountain landscape` - Generates a new image with the default overlay (Stable Diffusion)
+- `@toka degenify a futuristic city. scale to 0.5` - Generates an image with the degenify overlay
+- `@toka higherify a beach sunset. opacity to 0.7` - Generates an image with the higherify overlay
+- `@toka scrollify a minimalist tech background. color to blue` - Generates an image with the scrollify overlay
+- `@toka lensify a professional portrait. scale to 0.4` - Generates an image with the lensify overlay
+- `@toka higherise a cityscape. scale to 0.6` - Generates an image with the higherise overlay
+- `@toka dickbuttify a meme template. position at 10, 20` - Generates an image with the dickbuttify overlay
+- `@toka nikefy a sports scene. opacity to 0.8` - Generates an image with the nikefy overlay
+- `@toka nounify a cartoon character. scale to 0.5` - Generates an image with the nounify overlay
+- `@toka baseify a crypto-themed image. color to blue` - Generates an image with the baseify overlay
+- `@toka clankerify a robot scene. scale to 0.7` - Generates an image with the clankerify overlay
+- `@toka mantleify a blockchain visualization. scale to 0.5` - Generates an image with the mantleify overlay
 
 #### Applying Overlays to Existing Images
 
 When replying to a cast with an image:
 
-- `@snel degenify this image` - Applies the degenify overlay to the image in the parent cast
-- `@snel higherify this. scale to 0.3` - Applies the higherify overlay with scaling
-- `@snel scrollify. position at 10, 20` - Applies the scrollify overlay with positioning
-- `@snel lensify this photo. opacity to 0.5` - Applies the lensify overlay with opacity adjustment
-- `@snel overlay with degenify. color to red` - Applies the degenify overlay with color adjustment
-- `@snel higherise this` - Applies the higherise overlay to the parent image
-- `@snel dickbuttify this photo` - Applies the dickbuttify overlay to the parent image
-- `@snel nikefy. scale to 0.4` - Applies the nikefy overlay with scaling
-- `@snel nounify this. position at 20, 30` - Applies the nounify overlay with positioning
-- `@snel baseify this image. opacity to 0.6` - Applies the baseify overlay with opacity adjustment
-- `@snel clankerify. color to green` - Applies the clankerify overlay with color adjustment
-- `@snel mantleify this image. scale to 0.4` - Applies the mantleify overlay with scaling
+- `@toka degenify this image` - Applies the degenify overlay to the image in the parent cast
+- `@toka higherify this. scale to 0.3` - Applies the higherify overlay with scaling
+- `@toka scrollify. position at 10, 20` - Applies the scrollify overlay with positioning
+- `@toka lensify this photo. opacity to 0.5` - Applies the lensify overlay with opacity adjustment
+- `@toka overlay with degenify. color to red` - Applies the degenify overlay with color adjustment
+- `@toka higherise this` - Applies the higherise overlay to the parent image
+- `@toka dickbuttify this photo` - Applies the dickbuttify overlay to the parent image
+- `@toka nikefy. scale to 0.4` - Applies the nikefy overlay with scaling
+- `@toka nounify this. position at 20, 30` - Applies the nounify overlay with positioning
+- `@toka baseify this image. opacity to 0.6` - Applies the baseify overlay with opacity adjustment
+- `@toka clankerify. color to green` - Applies the clankerify overlay with color adjustment
+- `@toka mantleify this image. scale to 0.4` - Applies the mantleify overlay with scaling
 
 The bot is smart enough to understand that when you reply to a cast and use phrases like "this image", "this photo", or simply specify an overlay mode, you want to apply the overlay to the image in the parent cast.
 
@@ -697,7 +706,7 @@ The application now supports Farcaster Frames, allowing users to interact with t
 
 #### Using the Frame
 
-1. Visit the frame URL: `https://wowowifyer.vercel.app/frames`
+1. Visit the frame URL: `https://wowowify.vercel.app/frames`
 2. The frame will appear in Farcaster clients with a button to open the interactive interface
 3. Once opened, you can:
    - Select an overlay mode
@@ -805,13 +814,13 @@ You can use the ghiblify feature in several ways:
 1. **Through the Farcaster Bot**:
 
    ```
-   @snel ghiblify this image
+   @toka ghiblify this image
    ```
 
    When replying to a cast with an image, or:
 
    ```
-   @snel ghiblify a mountain landscape
+   @toka ghiblify a mountain landscape
    ```
 
    To generate and transform a new image

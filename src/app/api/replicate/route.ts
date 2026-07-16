@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import Replicate from "replicate";
 import { logger } from "@/lib/logger";
 import { getRateLimitInfo } from "@/lib/rate-limiter";
+import { registerPending } from "@/lib/predictions";
+import { APP_URL } from "@/lib/env";
 
 // Mark the route as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";
@@ -42,12 +44,26 @@ export async function POST(request: Request): Promise<Response> {
 
     // Handle both FormData and JSON requests
     let dataUrl: string;
+    let castHash: string | undefined;
+    let account: string | undefined;
+    let webhookUrl: string | undefined;
     const contentType = request.headers.get("content-type");
 
     if (contentType?.includes("multipart/form-data")) {
       // Handle FormData
       const formData = await request.formData();
       const imageFile = formData.get("image") as File;
+      const meta = formData.get("meta");
+      if (typeof meta === "string") {
+        try {
+          const parsed = JSON.parse(meta);
+          castHash = parsed.castHash;
+          account = parsed.account;
+          webhookUrl = parsed.webhookUrl;
+        } catch {
+          // ignore — meta was malformed; proceed without webhook
+        }
+      }
 
       if (!imageFile) {
         return NextResponse.json(
@@ -56,12 +72,10 @@ export async function POST(request: Request): Promise<Response> {
         );
       }
 
-      // Convert the image file to base64
       const buffer = await imageFile.arrayBuffer();
       const base64Image = Buffer.from(buffer).toString("base64");
       dataUrl = `data:${imageFile.type};base64,${base64Image}`;
     } else {
-      // Handle JSON request
       const body = await request.json();
       if (!body.imageUrl) {
         return NextResponse.json(
@@ -69,8 +83,14 @@ export async function POST(request: Request): Promise<Response> {
           { status: 400, headers: responseHeaders }
         );
       }
+      castHash = body.castHash;
+      account = body.account;
+      // Webhook callback only applies to the Farcaster flow — the web UI has
+      // no callback consumer and would orphan a Redis pending entry.
+      webhookUrl = castHash
+        ? body.webhookUrl ?? `${APP_URL}/api/replicate/webhook`
+        : undefined;
 
-      // Download the image and convert to base64
       try {
         const imageResponse = await fetch(body.imageUrl, {
           headers: {
@@ -103,9 +123,16 @@ export async function POST(request: Request): Promise<Response> {
     logger.info("Starting Replicate prediction", {
       ip,
       contentType,
+      hasWebhook: Boolean(webhookUrl),
+      hasCastHash: Boolean(castHash),
     });
 
-    // Create prediction
+    // Webhook routing is one-line: the Farcaster flow gets a webhook URL,
+    // the web UI gets nothing. Replicate fires its webhook (when configured)
+    // to the canonical /api/replicate/webhook endpoint; our webhook handler
+    // looks the castHash up in Redis and posts the Neynar reply.
+    const webhookPredictionUrl = webhookUrl;
+
     const prediction = await replicate.predictions.create({
       version:
         "4b82bb7dbb3b153882a0c34d7f2cbc4f7012ea7eaddb4f65c257a3403c9b3253",
@@ -117,14 +144,61 @@ export async function POST(request: Request): Promise<Response> {
         num_inference_steps: 50,
         lora_scale: 0.7,
       },
+      ...(webhookPredictionUrl
+        ? { webhook: webhookPredictionUrl, webhook_events_filter: ["completed"] }
+        : {}),
     });
+
+    // Post-creation: register prediction ↔ castHash mapping for callback lookup
+    if (castHash) {
+      try {
+        await registerPending(prediction.id, {
+          castHash,
+          account,
+          source: "farcaster",
+        });
+      } catch (error) {
+        logger.error("Failed to register pending prediction in Redis — cancelling prediction", {
+          error: error instanceof Error ? error.message : String(error),
+          predictionId: prediction.id,
+        });
+        // Best-effort cancel so the orphan Replicate job doesn't callback into
+        // /api/replicate/webhook without a Redis mapping. The orphan will also
+        // self-clean via Replicate's job TTL, but cancelling short-circuits it.
+        try {
+          await replicate.predictions.cancel(prediction.id);
+          logger.info("Cancelled orphan Replicate prediction", {
+            predictionId: prediction.id,
+          });
+        } catch (cancelError) {
+          logger.warn(
+            "Failed to cancel orphan Replicate prediction — Replicate job TTL will reclaim it",
+            {
+              error:
+                cancelError instanceof Error
+                  ? cancelError.message
+                  : String(cancelError),
+              predictionId: prediction.id,
+            },
+          );
+        }
+        // Fail loud — caller needs to know callback routing is broken
+        return NextResponse.json(
+          {
+            error:
+              "Internal error: could not register prediction. Please retry.",
+          },
+          { status: 500, headers: responseHeaders },
+        );
+      }
+    }
 
     logger.info("Created Replicate prediction", {
       id: prediction.id,
       status: prediction.status,
+      webhook: Boolean(webhookPredictionUrl),
     });
 
-    // Return the prediction ID immediately
     return NextResponse.json(
       {
         id: prediction.id,

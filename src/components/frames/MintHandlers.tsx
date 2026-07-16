@@ -2,6 +2,7 @@
 
 import { encodeFunctionData } from "viem";
 import { EthereumError } from "./NetworkHandlers";
+import { logger } from "@/lib/logger";
 
 // Interface for mint result
 export interface MintResult {
@@ -44,13 +45,13 @@ export const handleMintBaseNFT = async (
   try {
     // Normalize the overlay type to ensure consistency
     const normalizedOverlayType = overlayType.toLowerCase();
-    console.log("Minting with overlay type:", normalizedOverlayType);
+    logger.info("MintHandlers: starting", { overlayType: normalizedOverlayType });
 
     // Create a metadata URI that includes the Grove URL
     const metadataUri = `ipfs://${normalizedOverlayType}/${encodeURIComponent(
       groveUrl
     )}`;
-    console.log("Metadata URI:", metadataUri);
+    logger.info("MintHandlers: metadata URI", { metadataUri });
 
     // Get the overlay type enum value
     let overlayTypeEnum = 0; // Default to HIGHER
@@ -65,11 +66,11 @@ export const handleMintBaseNFT = async (
         overlayTypeEnum = 2; // DICKBUTTIFY
         break;
     }
-    console.log("Overlay type enum:", overlayTypeEnum);
+    logger.info("MintHandlers: overlay type enum", { enum: overlayTypeEnum });
 
     // Contract address on Base Sepolia
     const contractAddress = "0xF90552377071C01B8922c4879eA9E20A39476998";
-    console.log("Using contract address:", contractAddress);
+    logger.info("MintHandlers: contract address", { contractAddress });
 
     // ABI for the mintNFT function and price getter - using proper format for viem
     const contractAbi = [
@@ -99,22 +100,27 @@ export const handleMintBaseNFT = async (
       throw new Error("No Ethereum provider found. Please install a wallet.");
     }
 
-    console.log("Requesting account access...");
+    logger.info("MintHandlers: requesting account access");
     const accounts = await window.ethereum.request({
       method: "eth_requestAccounts",
     });
 
     const walletAddress = accounts[0];
-    console.log("Connected wallet address:", walletAddress);
+    // Privacy: truncate to first/last 4 chars (matches the display style used in
+    // FrameContent). Avoids leaking the full wallet address to browser DevTools.
+    logger.info("MintHandlers: wallet connected", {
+      addressPrefix: walletAddress.slice(0, 6),
+      addressSuffix: walletAddress.slice(-4),
+    });
 
     try {
       // Check if we're on Base Sepolia (chain ID: 84532)
       const chainId = await window.ethereum.request({ method: "eth_chainId" });
-      console.log("Current chain ID:", chainId);
+      logger.info("MintHandlers: current chain ID", { chainId: String(chainId) });
 
       if (chainId !== "0x14a34") {
         // 84532 in hex
-        console.log("Switching to Base Sepolia...");
+        logger.info("MintHandlers: switching to Base Sepolia");
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
@@ -149,14 +155,10 @@ export const handleMintBaseNFT = async (
       // Use the known constant price from the contract
       // 0.05 ETH = 50000000000000000 wei = 0x0B1A2BC2EC50000
       const mintPriceHex = "0x0B1A2BC2EC50000"; // 0.05 ETH (50000000000000000 wei)
-      console.log(
-        "Using contract's ORIGINAL_PRICE:",
-        mintPriceHex,
-        "(0.05 ETH)"
-      );
+      logger.info("MintHandlers: using original price", { mintPriceHex: String(mintPriceHex), ethEquivalent: "0.05 ETH" });
 
       // Encode the mint function call
-      console.log("Encoding mint function call...");
+      logger.info("MintHandlers: encoding mint function call");
       const mintData = encodeFunctionData({
         abi: contractAbi,
         functionName: "mintOriginalNFT",
@@ -170,27 +172,28 @@ export const handleMintBaseNFT = async (
       });
 
       // Prepare transaction with the dynamically fetched price
-      console.log("Preparing transaction...");
+      logger.info("MintHandlers: preparing transaction");
       const txParams = {
         from: walletAddress,
         to: contractAddress,
         data: mintData,
         value: mintPriceHex,
       };
-      console.log("Transaction params:", {
-        from: txParams.from,
+      logger.info("MintHandlers: transaction params", {
+        fromPrefix: txParams.from?.slice(0, 6) ?? null,
+        fromSuffix: txParams.from?.slice(-4) ?? null,
         to: txParams.to,
         value: txParams.value,
       });
 
       // Send transaction
-      console.log("Sending transaction...");
+      logger.info("MintHandlers: sending transaction");
       const hash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [txParams],
       });
 
-      console.log("Transaction hash:", hash);
+      logger.info("MintHandlers: transaction hash", { hash: String(hash) });
 
       // Set transaction hash and update UI
       setMintResult({
@@ -243,10 +246,9 @@ export const handleMintBaseNFT = async (
           ? errorObj.reason
           : JSON.stringify(errorObj);
 
-      console.log("Error details:", {
-        code: errorCode,
-        message: errorMessage,
-        raw: errorObj,
+      logger.error("MintHandlers: error details", {
+        code: errorCode ?? null,
+        message: errorMessage ?? null,
       });
     }
 
@@ -300,7 +302,7 @@ export const handleMintMantleNFT = async (
   try {
     // Create a metadata URI that includes the Grove URL
     const metadataUri = `ipfs://mantleify/${encodeURIComponent(groveUrl)}`;
-    console.log("Metadata URI:", metadataUri);
+    logger.info("MintHandlers: metadata URI", { metadataUri });
 
     // Contract address on Mantle Sepolia
     const contractAddress = "0x8b62d610c83c42ea8a8fc10f80581d9b7701cd37";
@@ -376,7 +378,7 @@ export const handleMintMantleNFT = async (
       params: [txParams],
     });
 
-    console.log("Transaction hash:", hash);
+    logger.info("MintHandlers: transaction hash", { hash: String(hash) });
 
     // Set transaction hash and update UI
     setMintResult({
@@ -463,7 +465,7 @@ export const handleMintScrollifyNFT = async (
   try {
     // Create a metadata URI that includes the Grove URL
     const metadataUri = `ipfs://scrollify/${encodeURIComponent(groveUrl)}`;
-    console.log("Metadata URI:", metadataUri);
+    logger.info("MintHandlers: metadata URI", { metadataUri });
 
     // Contract address on Scroll Sepolia
     const contractAddress = "0xf230170c3afd6bea32ab0d7747c04a831bf24968";
@@ -504,12 +506,10 @@ export const handleMintScrollifyNFT = async (
     const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
     const chainIdDecimal = parseInt(chainIdHex as string, 16);
 
-    console.log("Current chain ID:", {
-      hex: chainIdHex,
+    logger.info("MintHandlers: current chain ID", {
+      hex: String(chainIdHex),
       decimal: chainIdDecimal,
-      isCorrect:
-        chainIdDecimal === SCROLL_SEPOLIA_CHAIN_ID ||
-        chainIdHex === SCROLL_SEPOLIA_CHAIN_ID_HEX,
+      isCorrect: chainIdDecimal === SCROLL_SEPOLIA_CHAIN_ID || chainIdHex === SCROLL_SEPOLIA_CHAIN_ID_HEX,
     });
 
     // Check if we're already on the correct network
@@ -518,7 +518,7 @@ export const handleMintScrollifyNFT = async (
       chainIdHex === SCROLL_SEPOLIA_CHAIN_ID_HEX;
 
     if (!isCorrectNetwork) {
-      console.log("Switching to Scroll Sepolia...");
+      logger.info("MintHandlers: switching to Scroll Sepolia");
       try {
         await window.ethereum.request({
           method: "wallet_switchEthereumChain",
@@ -531,8 +531,8 @@ export const handleMintScrollifyNFT = async (
         });
         const newChainIdDecimal = parseInt(newChainIdHex as string, 16);
 
-        console.log("After switching, chain ID:", {
-          hex: newChainIdHex,
+        logger.info("MintHandlers: after switching chain ID", {
+          hex: String(newChainIdHex),
           decimal: newChainIdDecimal,
         });
 
@@ -571,8 +571,8 @@ export const handleMintScrollifyNFT = async (
             });
             const newChainIdDecimal = parseInt(newChainIdHex as string, 16);
 
-            console.log("After adding network, chain ID:", {
-              hex: newChainIdHex,
+            logger.info("MintHandlers: after adding network chain ID", {
+              hex: String(newChainIdHex),
               decimal: newChainIdDecimal,
             });
 
@@ -597,7 +597,7 @@ export const handleMintScrollifyNFT = async (
         }
       }
     } else {
-      console.log("Already on Scroll Sepolia network, no need to switch");
+      logger.info("MintHandlers: already on Scroll Sepolia network");
     }
 
     // Get the mint price from the contract
@@ -618,7 +618,7 @@ export const handleMintScrollifyNFT = async (
         ],
       });
 
-      console.log("Mint price from contract:", mintPriceHex);
+      logger.info("MintHandlers: mint price from contract", { mintPriceHex: String(mintPriceHex) });
 
       // Encode the mint function call
       const mintData = encodeFunctionData({
@@ -635,20 +635,21 @@ export const handleMintScrollifyNFT = async (
         value: mintPriceHex, // Use the price from the contract
       };
 
-      console.log("Transaction params:", {
-        from: txParams.from,
+      logger.info("MintHandlers: transaction params", {
+        fromPrefix: txParams.from?.slice(0, 6) ?? null,
+        fromSuffix: txParams.from?.slice(-4) ?? null,
         to: txParams.to,
         value: txParams.value,
       });
 
       // Send transaction
-      console.log("Sending transaction...");
+      logger.info("MintHandlers: sending transaction");
       const hash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [txParams],
       });
 
-      console.log("Transaction hash:", hash);
+      logger.info("MintHandlers: transaction hash", { hash: String(hash) });
 
       // Set transaction hash and update UI
       setMintResult({
@@ -665,7 +666,7 @@ export const handleMintScrollifyNFT = async (
 
       // Fallback to hardcoded price of 0.01 ETH
       const hardcodedPrice = "0x2386F26FC10000"; // 0.01 ETH in hex
-      console.log("Using hardcoded price:", hardcodedPrice);
+      logger.info("MintHandlers: using hardcoded price", { hardcodedPrice });
 
       // Encode the mint function call
       const mintData = encodeFunctionData({
@@ -682,20 +683,21 @@ export const handleMintScrollifyNFT = async (
         value: hardcodedPrice,
       };
 
-      console.log("Transaction params (with hardcoded price):", {
-        from: txParams.from,
+      logger.info("MintHandlers: transaction params hardcoded fallback", {
+        fromPrefix: txParams.from?.slice(0, 6) ?? null,
+        fromSuffix: txParams.from?.slice(-4) ?? null,
         to: txParams.to,
         value: txParams.value,
       });
 
       // Send transaction
-      console.log("Sending transaction with hardcoded price...");
+      logger.info("MintHandlers: sending transaction hardcoded fallback");
       const hash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [txParams],
       });
 
-      console.log("Transaction hash:", hash);
+      logger.info("MintHandlers: transaction hash", { hash: String(hash) });
 
       // Set transaction hash and update UI
       setMintResult({

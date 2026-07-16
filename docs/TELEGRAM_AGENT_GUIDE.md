@@ -19,7 +19,7 @@ const headers = {
 The main endpoint to use is:
 
 ```
-POST https://wowowifyer.vercel.app/api/agent
+POST https://wowowify.vercel.app/api/agent
 ```
 
 ## Request Format
@@ -67,7 +67,7 @@ const path = require("path");
 const bot = new Telegraf("YOUR_TELEGRAM_BOT_TOKEN");
 
 // API configuration
-const API_URL = "https://wowowifyer.vercel.app/api/agent";
+const API_URL = "https://wowowify.vercel.app/api/agent";
 const API_KEY = "process.env.TELEGRAM_API_KEY";
 
 // Handle /generate command
