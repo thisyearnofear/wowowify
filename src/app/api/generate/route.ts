@@ -114,6 +114,7 @@ export async function POST(request: Request) {
         hide_watermark,
         model,
         prompt,
+        format: "png",
         width: 768,
         height: 768,
       }),

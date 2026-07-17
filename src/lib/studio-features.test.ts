@@ -100,6 +100,6 @@ describe("buildDemoLaunchKit", () => {
     const kit = buildDemoLaunchKit("https://toka.example");
     expect(kit.id).toBe(DEMO_LAUNCH_KIT_ID);
     expect(kit.formats).toEqual(["square", "landscape", "portrait"]);
-    expect(kit.logoUrl).toContain("/demo/launch-mark.svg");
+    expect(kit.logoUrl).toContain("/demo/launch-mark.png");
   });
 });

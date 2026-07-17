@@ -54,6 +54,7 @@ export async function generateImage(
       prompt,
       model: VENICE_MODEL,
       hide_watermark: true,
+      format: "png",
       width: VENICE_WIDTH,
       height: VENICE_HEIGHT,
     }),

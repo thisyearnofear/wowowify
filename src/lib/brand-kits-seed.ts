@@ -12,7 +12,7 @@ export function buildDemoLaunchKit(appUrl: string = APP_URL): BrandKit {
   return {
     id: DEMO_LAUNCH_KIT_ID,
     name: "Demo Launch",
-    logoUrl: `${appUrl}/demo/launch-mark.svg`,
+    logoUrl: `${appUrl}/demo/launch-mark.png`,
     text: {
       content: "LAUNCH NOW",
       position: "bottom",
