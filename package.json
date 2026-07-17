@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "vercel-install": "npx --yes @socketsecurity/cli@1.1.102 npm install --legacy-peer-deps",
+    "vercel-install": "SOCKET_CLI_ACCEPT_RISKS=1 npx --yes @socketsecurity/cli@1.1.102 npm install --legacy-peer-deps",
     "install:safe": "socket npm install",
     "socket": "socket",
     "secrets:scan": "secretlint \"**/*\" --secretlintrc .secretlintrc.json",
