@@ -150,25 +150,35 @@ export async function closeRedisConnection(): Promise<void> {
   }
 }
 
-// Wrapper function to execute Redis operations with timeout and fallback
+/** Wait for ioredis to accept commands (cold starts on Vercel are async). */
+async function waitForRedisReady(maxWaitMs: number): Promise<void> {
+  const client = getRedisClient();
+  const deadline = Date.now() + maxWaitMs;
+
+  while (Date.now() < deadline) {
+    try {
+      await client.ping();
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  throw new Error(
+    `Redis not ready within ${maxWaitMs}ms (status: ${client.status})`,
+  );
+}
+
+// Wrapper function to execute Redis operations with timeout and optional fallback
 export async function executeWithTimeout<T>(
   operation: () => Promise<T>,
   timeoutMs: number = 5000, // 5 seconds default timeout
   fallbackValue?: T
 ): Promise<T> {
   try {
-    // Check if Redis client exists and is ready
-    if (!redisClient || !redisClient.status || redisClient.status !== "ready") {
-      logger.warn("Redis client not ready, using fallback", {
-        status: redisClient?.status || "null",
-      });
-      if (fallbackValue !== undefined) {
-        return fallbackValue;
-      }
-      throw new Error("Redis client not ready");
-    }
+    // Let ioredis queue the command — do not treat "connecting" as a miss.
+    await waitForRedisReady(Math.min(timeoutMs, 8000));
 
-    // Create a timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(
         () =>
@@ -177,14 +187,12 @@ export async function executeWithTimeout<T>(
       );
     });
 
-    // Race the operation against the timeout
     return await Promise.race([operation(), timeoutPromise]);
   } catch (error) {
     logger.error("Redis operation failed or timed out", {
       error: error instanceof Error ? error.message : String(error),
     });
 
-    // Return fallback value if provided
     if (fallbackValue !== undefined) {
       return fallbackValue;
     }

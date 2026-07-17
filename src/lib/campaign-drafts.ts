@@ -9,6 +9,7 @@ import {
   setInMemoryData,
 } from "@/lib/redis";
 import { STUDIO_URL } from "@/lib/deployment";
+import { IS_PRODUCTION } from "@/lib/env";
 
 const DRAFT_PREFIX = "campaign_draft:";
 const DRAFT_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -43,16 +44,24 @@ async function readDraft(id: string): Promise<CampaignDraft | null> {
   if (process.env.REDIS_URL) {
     try {
       const redis = getRedisClient();
-      const raw = await executeWithTimeout(() => redis.get(key), 3000, null);
+      const raw = await executeWithTimeout(() => redis.get(key), 8000);
       if (!raw) return null;
       return JSON.parse(raw) as CampaignDraft;
     } catch (error) {
-      logger.warn("Draft read failed, using memory fallback", {
+      logger.error("Draft read failed", {
         id,
         error: error instanceof Error ? error.message : String(error),
       });
+      if (IS_PRODUCTION) {
+        throw error;
+      }
     }
+  } else if (IS_PRODUCTION) {
+    throw new Error(
+      "Draft storage unavailable: REDIS_URL is not configured in production.",
+    );
   }
+
   const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
   return drafts.find((draft) => draft.id === id) ?? null;
 }
@@ -64,15 +73,26 @@ async function writeDraft(draft: CampaignDraft): Promise<void> {
       const redis = getRedisClient();
       await executeWithTimeout(
         () => redis.set(key, JSON.stringify(draft), "EX", DRAFT_TTL_SECONDS),
-        3000,
+        8000,
       );
+      return;
     } catch (error) {
-      logger.warn("Draft write failed, using memory fallback", {
+      logger.error("Draft write failed", {
         id: draft.id,
         error: error instanceof Error ? error.message : String(error),
       });
+      if (IS_PRODUCTION) {
+        throw new Error(
+          "Draft persistence failed: REDIS_URL is set but the draft could not be saved.",
+        );
+      }
     }
+  } else if (IS_PRODUCTION) {
+    throw new Error(
+      "Draft storage unavailable: REDIS_URL is not configured in production.",
+    );
   }
+
   const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
   const next = drafts.filter((entry) => entry.id !== draft.id);
   next.unshift(draft);
