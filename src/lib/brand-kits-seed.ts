@@ -1,4 +1,4 @@
-import { APP_URL } from "@/lib/env";
+import { STUDIO_URL } from "@/lib/deployment";
 import type { BrandKit } from "@/lib/brand-kits";
 
 /** Stable id for the bundled demo launch kit — safe to reference in docs and deep links. */
@@ -7,12 +7,13 @@ export const DEMO_LAUNCH_KIT_ID = "demo-launch";
 /** @deprecated Legacy alias — resolves to the same demo kit. */
 export const LEGACY_LAUNCH_KIT_IDS = ["lisk-launch"] as const;
 
-export function buildDemoLaunchKit(appUrl: string = APP_URL): BrandKit {
+export function buildDemoLaunchKit(appUrl: string = STUDIO_URL): BrandKit {
   const now = new Date().toISOString();
   return {
     id: DEMO_LAUNCH_KIT_ID,
     name: "Demo Launch",
-    logoUrl: `${appUrl}/demo/launch-mark.png`,
+    // Static assets are served from Studio; ASP is API-only.
+    logoUrl: `${STUDIO_URL}/demo/launch-mark.png`,
     text: {
       content: "LAUNCH NOW",
       position: "bottom",
