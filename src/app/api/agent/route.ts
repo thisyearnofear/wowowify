@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { ParsedCommand } from "@/lib/agent-types";
+import {
+  CAMPAIGN_FORMATS,
+  CampaignFormat,
+  ParsedCommand,
+} from "@/lib/agent-types";
 import { logger } from "@/lib/logger";
 import { v4 as uuidv4 } from "uuid";
 import { incrementTotalRequests, incrementFailedRequests } from "@/lib/metrics";
@@ -7,12 +11,58 @@ import { getRateLimitInfo } from "@/lib/rate-limiter";
 import { ensureFontsAreRegistered } from "@/lib/image-processor";
 import { getImageService, InterfaceType } from "@/lib/services";
 import { validateOverlayMode } from "@/lib/config/overlays";
+import { getBrandKit, mergeBrandKitIntoCommand } from "@/lib/brand-kits";
+import { getAgentCapabilityCard } from "@/lib/agent-capability-card";
+import { saveCampaignDraft } from "@/lib/campaign-drafts";
+import { checkAgentPayment } from "@/lib/x402";
+import type { CampaignKitResponse } from "@/lib/agent-types";
 
 // Mark the route as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";
 
+/** Public service card used by agent marketplaces and integration checks. */
+export function GET(): Response {
+  return NextResponse.json(getAgentCapabilityCard(), {
+    headers: {
+      "Cache-Control": "public, max-age=300",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
 // Timeout for image processing — 10s to stay within Vercel Hobby (10s) function limit
 const TIMEOUT_MS = 10000;
+
+async function persistReviewDraft(options: {
+  command?: string;
+  brandKitId?: string;
+  formats?: CampaignFormat[] | null;
+  parsedCommand: ParsedCommand;
+  result: {
+    status: string;
+    previewUrl?: string;
+    resultUrl?: string;
+    assets?: CampaignKitResponse["assets"];
+    error?: string;
+  };
+}) {
+  if (options.result.status !== "completed") return null;
+  const draft = await saveCampaignDraft({
+    command: options.command || options.parsedCommand.prompt || "",
+    brief: options.parsedCommand.prompt,
+    brandKitId: options.brandKitId,
+    logoUrl: options.parsedCommand.logoUrl,
+    overlayMode: options.parsedCommand.overlayMode,
+    text: options.parsedCommand.text,
+    controls: options.parsedCommand.controls,
+    formats: options.formats || undefined,
+    previewUrl: options.result.previewUrl,
+    resultUrl: options.result.resultUrl,
+    assets: options.result.assets,
+    status: "completed",
+  });
+  return { draftId: draft.id, studioReviewUrl: draft.studioReviewUrl };
+}
 
 // Valid API keys for external agents
 const VALID_API_KEYS = {
@@ -26,6 +76,9 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     incrementTotalRequests().catch(() => {});
+
+    const paymentGate = checkAgentPayment(request);
+    if (paymentGate) return paymentGate;
 
     // Ensure fonts are registered before processing
     await ensureFontsAreRegistered();
@@ -127,6 +180,26 @@ export async function POST(request: Request): Promise<Response> {
     // Extract wallet address for Grove storage
     const walletAddressForOverlay = body.walletAddress as string;
     const parentImageUrl = body.parentImageUrl; // Extract parent image URL
+    const requestedFormats = providedParameters?.formats;
+    let campaignFormats: CampaignFormat[] | null = null;
+
+    if (requestedFormats !== undefined) {
+      if (
+        !Array.isArray(requestedFormats) ||
+        requestedFormats.length === 0 ||
+        requestedFormats.length > CAMPAIGN_FORMATS.length ||
+        !requestedFormats.every((format) =>
+          CAMPAIGN_FORMATS.includes(format as CampaignFormat),
+        )
+      ) {
+        return NextResponse.json(
+          { error: "formats must contain square, landscape, and/or portrait" },
+          { status: 400, headers: responseHeaders },
+        );
+      }
+
+      campaignFormats = [...new Set(requestedFormats)] as CampaignFormat[];
+    }
 
     // Determine interface type based on request headers
     const isFarcaster = body.isFarcaster === true;
@@ -154,28 +227,68 @@ export async function POST(request: Request): Promise<Response> {
 
     const imageService = getImageService(interfaceType);
 
-    // Parse the command if not provided explicitly
+    // Parse natural language first, then apply structured parameters as
+    // explicit overrides below. Parameter-only callers retain support.
     let parsedCommand: ParsedCommand;
-    if (providedParameters) {
-      parsedCommand = providedParameters as ParsedCommand;
-    } else if (!command) {
-      return NextResponse.json(
-        { error: "No command or parameters provided" },
-        { status: 400 }
-      );
-    } else {
-      // Parse the command using our service
+    if (command) {
       parsedCommand = imageService.parseCommand(
         command,
         interfaceType,
         parentImageUrl
       );
+    } else if (providedParameters) {
+      parsedCommand = {
+        action:
+          providedParameters.action ||
+          (providedParameters.baseImageUrl ? "overlay" : "generate"),
+        ...providedParameters,
+      } as ParsedCommand;
+    } else {
+      return NextResponse.json(
+        { error: "No command or parameters provided" },
+        { status: 400 }
+      );
+    }
+
+    if (providedParameters?.brandKitId) {
+      const kit = await getBrandKit(providedParameters.brandKitId);
+      if (!kit) {
+        return NextResponse.json(
+          { error: "Brand kit not found" },
+          { status: 404, headers: responseHeaders },
+        );
+      }
+      parsedCommand = mergeBrandKitIntoCommand(parsedCommand, kit);
+      if (!campaignFormats && kit.formats?.length) {
+        campaignFormats = kit.formats;
+      }
     }
 
     // Override with explicit parameters if provided
     if (body.parameters) {
       if (body.parameters.baseImageUrl) {
         parsedCommand.baseImageUrl = body.parameters.baseImageUrl;
+      }
+      if (body.parameters.logoUrl) {
+        if (typeof body.parameters.logoUrl !== "string") {
+          return NextResponse.json(
+            { error: "logoUrl must be a public HTTP(S) image URL" },
+            { status: 400, headers: responseHeaders }
+          );
+        }
+
+        try {
+          const logoUrl = new URL(body.parameters.logoUrl);
+          if (logoUrl.protocol !== "http:" && logoUrl.protocol !== "https:") {
+            throw new Error("Unsupported URL protocol");
+          }
+          parsedCommand.logoUrl = logoUrl.toString();
+        } catch {
+          return NextResponse.json(
+            { error: "logoUrl must be a public HTTP(S) image URL" },
+            { status: 400, headers: responseHeaders }
+          );
+        }
       }
       if (body.parameters.prompt) {
         parsedCommand.prompt = body.parameters.prompt;
@@ -209,7 +322,7 @@ export async function POST(request: Request): Promise<Response> {
           ...body.parameters.text,
         };
       }
-      // If parameters are provided directly, use them as the parsed command
+      // Explicit action takes precedence over the inferred action.
       if (body.parameters.action) {
         parsedCommand.action = body.parameters.action;
       }
@@ -221,9 +334,35 @@ export async function POST(request: Request): Promise<Response> {
         action: parsedCommand.action,
         ip,
         baseImageUrl: parsedCommand.baseImageUrl ? "provided" : "not provided",
+        logoUrl: parsedCommand.logoUrl ? "provided" : "not provided",
         useParentImage: parsedCommand.useParentImage,
         overlayMode: parsedCommand.overlayMode,
       });
+
+      if (campaignFormats) {
+        const result = await imageService.processCampaignKit(
+          parsedCommand,
+          campaignFormats,
+          baseUrl,
+        );
+        const draftMeta =
+          result.status === "completed"
+            ? await persistReviewDraft({
+                command,
+                brandKitId: providedParameters?.brandKitId,
+                formats: campaignFormats,
+                parsedCommand,
+                result,
+              })
+            : null;
+        return NextResponse.json(
+          draftMeta ? { ...result, ...draftMeta } : result,
+          {
+            status: result.status === "completed" ? 200 : 500,
+            headers: responseHeaders,
+          },
+        );
+      }
 
       // Process the command using our service
       const result = await imageService.processCommand(
@@ -233,7 +372,15 @@ export async function POST(request: Request): Promise<Response> {
         isFarcaster
       );
 
-      return NextResponse.json(result, {
+      const draftMeta = await persistReviewDraft({
+        command,
+        brandKitId: providedParameters?.brandKitId,
+        formats: campaignFormats,
+        parsedCommand,
+        result,
+      });
+
+      return NextResponse.json(draftMeta ? { ...result, ...draftMeta } : result, {
         status: 200,
         headers: responseHeaders,
       });

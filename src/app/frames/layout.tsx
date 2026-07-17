@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
+import { APP_URL } from "@/lib/env";
+import { MINIAPP_CONFIG } from "@/lib/miniapp";
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wowowify.vercel.app";
+const appUrl = APP_URL;
 
 // Mini App Embed configuration
 const miniAppEmbed = {
   version: "1",
   imageUrl: `${appUrl}/previews/frame-preview.png`,
   button: {
-    title: "🎨 WOWOWIFY",
+    title: "@toka",
     action: {
       type: "launch_frame",
-      name: "WOWOWIFY",
+      name: "@toka",
       url: `${appUrl}/frames`,
       splashImageUrl: `${appUrl}/wowwowowify.png`,
       splashBackgroundColor: "#131313",
@@ -23,10 +25,10 @@ const frameConfig = {
   version: "next",
   imageUrl: `${appUrl}/previews/frame-preview.png`,
   button: {
-    title: "wowowify",
+    title: "@toka",
     action: {
       type: "launch_frame",
-      name: "WOWOWIFY",
+      name: "@toka",
       url: `${appUrl}/frames`,
       splashImageUrl: `${appUrl}/wowwowowify.png`,
       splashBackgroundColor: "#131313",
@@ -35,29 +37,26 @@ const frameConfig = {
 };
 
 export const metadata: Metadata = {
-  title: "WOWOWIFY",
-  description:
-    "Create amazing visual overlays and effects directly in Farcaster. Transform your images with cool wowowify effects in seconds.",
+  title: `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+  description: MINIAPP_CONFIG.description,
   openGraph: {
-    title: "WOWOWIFY",
-    description:
-      "Create amazing visual overlays and effects directly in Farcaster",
+    title: `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+    description: MINIAPP_CONFIG.description,
     images: [
       {
         url: `${appUrl}/previews/frame-preview.png`,
         width: 1200,
         height: 630,
-        alt: "WOWOWIFY Frame Preview",
+        alt: "@toka Mini App Preview",
       },
     ],
-    siteName: "WOWOWIFY",
+    siteName: "@toka",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "WOWOWIFY",
-    description:
-      "Create amazing visual overlays and effects directly in Farcaster",
+    title: `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+    description: MINIAPP_CONFIG.description,
     images: [`${appUrl}/previews/frame-preview.png`],
   },
   other: {
@@ -66,9 +65,8 @@ export const metadata: Metadata = {
     // Legacy frame tag for backward compatibility
     "fc:frame": JSON.stringify(frameConfig),
     // Additional Mini App metadata
-    "fc:miniapp:name": "WOWOWIFY",
-    "fc:miniapp:description":
-      "Create amazing visual overlays and effects directly in Farcaster",
+    "fc:miniapp:name": "@toka",
+    "fc:miniapp:description": MINIAPP_CONFIG.description,
     "fc:miniapp:icon": `${appUrl}/wowwowowify.png`,
     "fc:miniapp:splash": `${appUrl}/wowwowowify.png`,
     "fc:miniapp:splash-background": "#131313",

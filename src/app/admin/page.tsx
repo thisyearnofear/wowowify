@@ -3,10 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Navigation from "@/components/Navigation";
 import Image from "next/image";
-import WalletConnect from "@/components/WalletConnect";
 import { ImageRecord } from "@/lib/metrics";
-import BaseNFTGallery from "@/components/BaseNFTGallery";
-import L2NFTGallery from "@/components/L2NFTGallery";
 
 function AdminContent() {
   // --- Auth state (must be declared before any conditional return) ---
@@ -50,16 +47,18 @@ function AdminContent() {
       }
       const data = await response.json();
 
-      // Filter out images that don't have valid URLs and keep only Grove images
+      // Filter to records with a usable asset URL (campaign + legacy Grove)
       const validImages = (data.history || [])
-        .filter((img: ImageRecord) => img.groveUrl)
+        .filter(
+          (img: ImageRecord) =>
+            Boolean(img.resultUrl || img.groveUrl),
+        )
         .sort((a: ImageRecord, b: ImageRecord) => {
-          // Sort by timestamp, newest first
           return (
             new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
           );
         })
-        .slice(0, 4); // Keep only the latest 4 images
+        .slice(0, 12);
 
       setImages(validImages);
       setError("");
@@ -80,16 +79,21 @@ function AdminContent() {
     }
   }, [fetchImages, isAuthenticated]);
 
-  // Get the best available image URL (Grove URL if available, otherwise temporary URL)
+  // Prefer persistent campaign URLs; fall back to Grove when present.
   const getBestImageUrl = (image: ImageRecord): string => {
+    if (image.resultUrl) {
+      if (image.resultUrl.startsWith("https://ipfs.io/ipfs/")) {
+        return `/api/proxy?url=${encodeURIComponent(image.resultUrl)}`;
+      }
+      return image.resultUrl;
+    }
     if (image.groveUrl) {
-      // Check if it's an IPFS URL that needs proxying
       if (image.groveUrl.startsWith("https://ipfs.io/ipfs/")) {
         return `/api/proxy?url=${encodeURIComponent(image.groveUrl)}`;
       }
       return image.groveUrl;
     }
-    return image.resultUrl;
+    return "";
   };
 
   // --- Auth gate (after all hooks) ---
@@ -100,7 +104,7 @@ function AdminContent() {
         <div className="flex justify-center mb-4">
           <Image
             src="/wowwowowify.png"
-            alt="WOWOWIFY"
+            alt="@toka"
             width={200}
             height={200}
             className="w-32 h-auto"
@@ -109,9 +113,9 @@ function AdminContent() {
         </div>
         <div className="max-w-sm mx-auto mt-8">
           <form onSubmit={handleLogin} className="space-y-4">
-            <h2 className="text-xl font-bold text-center">Admin Access</h2>
+            <h2 className="text-xl font-bold text-center">History</h2>
             <p className="text-sm text-center text-gray-500">
-              Enter the admin password to continue
+              Admin access to recent campaign artwork
             </p>
             <input
               type="password"
@@ -141,14 +145,10 @@ function AdminContent() {
     <div className="container mx-auto p-4 max-w-4xl">
       <Navigation />
 
-      <div className="flex justify-center mb-4">
-        <WalletConnect />
-      </div>
-
       <div className="flex justify-center mb-6">
         <Image
           src="/wowwowowify.png"
-          alt="WOWOWIFY"
+          alt="@toka"
           width={200}
           height={200}
           className="w-32 h-auto"
@@ -157,7 +157,7 @@ function AdminContent() {
       </div>
 
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-center mb-4">Latest</h2>
+        <h2 className="text-xl font-bold text-center mb-4">Recent campaigns</h2>
 
         {isInitialLoad || loading ? (
           <div className="flex justify-center p-4">
@@ -175,7 +175,7 @@ function AdminContent() {
           </div>
         ) : images.length === 0 ? (
           <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <p className="text-gray-600">No Grove images found</p>
+            <p className="text-gray-600">No campaign artwork yet</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -221,18 +221,9 @@ function AdminContent() {
           disabled={loading}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed text-sm"
         >
-          {loading ? "Loading..." : "Refresh Gallery"}
+          {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
-
-      {/* Base NFT Gallery */}
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-center mb-4">Base</h2>
-        <BaseNFTGallery />
-      </div>
-
-      {/* L2 NFT Gallery (Mantle and Scroll) */}
-      <L2NFTGallery />
     </div>
   );
 }

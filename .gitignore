@@ -41,6 +41,14 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# secrets & local credentials (never commit)
+.npmrc
+credentials.json
+secrets.json
+service-account*.json
+*.key
+*.p12
+
 # vercel
 .vercel
 

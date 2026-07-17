@@ -131,7 +131,7 @@ export const GenerateModal = ({
                   setGenerationPrompt(e.target.value);
                 }
               }}
-              placeholder="Or describe your image... (max 500 characters)"
+              placeholder="Describe your campaign brief… (max 500 characters)"
               className="w-full px-4 py-3 border rounded-lg resize-none min-h-[80px] text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               rows={3}
             />
@@ -148,7 +148,7 @@ export const GenerateModal = ({
                     : "bg-violet-600 text-white hover:bg-violet-700"
                 }`}
               >
-                {isGenerating ? <LoadingText /> : "Generate"}
+                {isGenerating ? <LoadingText /> : "Generate visual"}
               </button>
             </div>
           </div>

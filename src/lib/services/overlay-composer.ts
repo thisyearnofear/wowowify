@@ -18,20 +18,53 @@
 
 import { Canvas, CanvasRenderingContext2D, createCanvas, loadImage } from "canvas";
 
-import type { ParsedCommand } from "@/lib/agent-types";
+import type { CampaignFormat, ParsedCommand } from "@/lib/agent-types";
+import { FORMAT_ASPECT_RATIOS } from "@/lib/campaign-formats";
 import { logger } from "@/lib/logger";
 import { OVERLAY_URLS } from "@/lib/config/overlays";
+import { downloadImage } from "./image-fetcher";
 import { renderText } from "./text-renderer";
 
 const PREVIEW_MAX_WIDTH = 300;
+
+function drawBaseImageForFormat(
+  baseImage: Awaited<ReturnType<typeof loadImage>>,
+  format?: CampaignFormat,
+): Canvas {
+  if (!format) {
+    const canvas = createCanvas(baseImage.width, baseImage.height);
+    canvas.getContext("2d").drawImage(baseImage, 0, 0);
+    return canvas;
+  }
+
+  const targetRatio = FORMAT_ASPECT_RATIOS[format];
+  const baseRatio = baseImage.width / baseImage.height;
+  const width =
+    baseRatio > targetRatio
+      ? Math.round(baseImage.height * targetRatio)
+      : baseImage.width;
+  const height =
+    baseRatio > targetRatio
+      ? baseImage.height
+      : Math.round(baseImage.width / targetRatio);
+  const sourceWidth = baseRatio > targetRatio ? Math.round(baseImage.height * targetRatio) : baseImage.width;
+  const sourceHeight = baseRatio > targetRatio ? baseImage.height : Math.round(baseImage.width / targetRatio);
+  const sourceX = Math.max(0, Math.round((baseImage.width - sourceWidth) / 2));
+  const sourceY = Math.max(0, Math.round((baseImage.height - sourceHeight) / 2));
+  const canvas = createCanvas(width, height);
+  canvas
+    .getContext("2d")
+    .drawImage(baseImage, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+  return canvas;
+}
 
 /**
  * Apply the chosen overlay image onto the canvas — or skip cleanly if 'wowowify'
  * is the chosen mode (the 'no-stamp' mode is just the base image unchanged).
  *
- * Errors during the overlay image fetch/rasterize are logged and swallowed so
- * the composition continues without the overlay rather than aborting the
- * whole pipeline.
+ * Preset fetch/rasterize failures remain best-effort for backward
+ * compatibility. Custom-logo failures abort so callers never receive an
+ * apparently successful but unbranded deliverable.
  */
 async function applyOverlayToCanvas(
   ctx: CanvasRenderingContext2D,
@@ -41,14 +74,16 @@ async function applyOverlayToCanvas(
   abortSignal: AbortSignal,
 ): Promise<void> {
   const overlayMode = parsedCommand.overlayMode;
-  if (!overlayMode) return;
+  const configuredOverlayUrl = overlayMode ? OVERLAY_URLS[overlayMode] : undefined;
+  const overlayUrl = parsedCommand.logoUrl || configuredOverlayUrl;
+  if (!overlayUrl) return;
 
-  logger.info("Applying overlay", { overlayMode });
-
-  const overlayUrl = OVERLAY_URLS[overlayMode];
-  if (!overlayUrl) {
+  if (overlayMode && !parsedCommand.logoUrl && !configuredOverlayUrl) {
     throw new Error(`Unsupported overlay mode: ${overlayMode}`);
   }
+
+  const overlaySource = parsedCommand.logoUrl ? "custom-logo" : "preset";
+  logger.info("Applying overlay", { overlayMode, overlaySource });
 
   const fullOverlayUrl = overlayUrl.startsWith("/")
     ? `${baseUrl}${overlayUrl}`
@@ -57,14 +92,7 @@ async function applyOverlayToCanvas(
   logger.info("Fetching overlay", { url: fullOverlayUrl });
 
   try {
-    const overlayResponse = await fetch(fullOverlayUrl, { signal: abortSignal });
-    if (!overlayResponse.ok) {
-      throw new Error(
-        `Failed to download overlay: ${overlayResponse.statusText}`,
-      );
-    }
-
-    const overlayBuffer = Buffer.from(await overlayResponse.arrayBuffer());
+    const overlayBuffer = await downloadImage(fullOverlayUrl, abortSignal);
     const overlayImage = await loadImage(overlayBuffer);
 
     const scale = parsedCommand.controls?.scale || 1;
@@ -76,13 +104,25 @@ async function applyOverlayToCanvas(
       (canvas.height - scaledHeight) / 2 + (parsedCommand.controls?.y || 0);
 
     ctx.drawImage(overlayImage, x, y, scaledWidth, scaledHeight);
-    logger.info("Overlay applied successfully", { overlayMode, scale, x, y });
+    logger.info("Overlay applied successfully", {
+      overlayMode,
+      overlaySource,
+      scale,
+      x,
+      y,
+    });
   } catch (error) {
     logger.error("Error applying overlay", {
       error: error instanceof Error ? error.message : "Unknown error",
       overlayMode,
+      overlaySource,
     });
-    // Per design: continue without the overlay rather than failing completely.
+    // A requested custom logo is part of the deliverable contract: never
+    // silently return an unbranded result. Presets remain best-effort for
+    // backward compatibility with the existing generation flow.
+    if (parsedCommand.logoUrl) {
+      throw error;
+    }
   }
 }
 
@@ -98,13 +138,11 @@ export async function composeImage(
   baseImageBuffer: Buffer,
   baseUrl: string,
   abortSignal: AbortSignal,
+  format?: CampaignFormat,
 ): Promise<{ resultBuffer: Buffer; previewBuffer: Buffer }> {
   const baseImage = await loadImage(baseImageBuffer);
-  const canvas = createCanvas(baseImage.width, baseImage.height);
+  const canvas = drawBaseImageForFormat(baseImage, format);
   const ctx = canvas.getContext("2d");
-
-  // 1. Draw base image
-  ctx.drawImage(baseImage, 0, 0);
 
   // 2. Color tint overlay
   const overlayAlpha = parsedCommand.controls?.overlayAlpha;
@@ -115,8 +153,12 @@ export async function composeImage(
     ctx.globalAlpha = 1;
   }
 
-  // 3. Overlay image (skip for 'wowowify' = "no stamp")
-  if (parsedCommand.overlayMode && parsedCommand.overlayMode !== "wowowify") {
+  // 3. Exact custom logo or preset overlay. A custom logo remains active even
+  // when 'wowowify' is selected because that mode only suppresses preset stamps.
+  if (
+    parsedCommand.logoUrl ||
+    (parsedCommand.overlayMode && parsedCommand.overlayMode !== "wowowify")
+  ) {
     await applyOverlayToCanvas(ctx, canvas, parsedCommand, baseUrl, abortSignal);
   }
 

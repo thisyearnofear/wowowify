@@ -1,26 +1,32 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Navigation from "@/components/Navigation";
 import Image from "next/image";
-import WalletConnect from "@/components/WalletConnect";
-import { useAccount } from "wagmi";
-import MintMantleifyButton from "@/components/MintMantleifyButton";
-import MintBaseNFTButton from "@/components/MintBaseNFTButton";
-import MintScrollifyNFTButton from "@/components/MintScrollifyNFTButton";
 import { useToast } from "@/components/ui/Toast";
+import { type CampaignFormat } from "@/lib/agent-types";
+import type { BrandKit } from "@/lib/brand-kits";
+import { buildStudioUrl } from "@/lib/studio-url";
+import { uploadLogoFile } from "@/lib/upload-logo-client";
+import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
+import { FormatSelector } from "@/components/studio/FormatSelector";
 
-// Loading indicator component
 const LoadingIndicator = () => (
   <div className="flex flex-col items-center justify-center py-4">
     <div className="relative w-16 h-16">
-      <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-200 rounded-full"></div>
-      <div className="absolute top-0 left-0 w-full h-full border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
+      <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-200 rounded-full" />
+      <div className="absolute top-0 left-0 w-full h-full border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
     </div>
     <div className="mt-4 text-center">
-      <p className="text-gray-700 font-medium">wowow in progress...</p>
-      <p className="text-gray-500 text-sm mt-1">This may take a few moments</p>
+      <p className="font-medium" style={{ color: "var(--color-text)" }}>
+        Creating artwork…
+      </p>
+      <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
+        This may take a few moments
+      </p>
     </div>
   </div>
 );
@@ -29,6 +35,7 @@ interface ParsedCommand {
   action: string;
   prompt?: string;
   overlayMode?: string;
+  logoUrl?: string;
   controls?: {
     scale?: number;
     x?: number;
@@ -53,30 +60,50 @@ interface CommandResult {
   error?: string;
   groveUri?: string;
   groveUrl?: string;
+  draftId?: string;
+  studioReviewUrl?: string;
+  assets?: Array<{
+    format: CampaignFormat;
+    resultUrl?: string;
+    previewUrl?: string;
+  }>;
 }
 
-// Main component — reads ?cmd= via useSearchParams (Suspense-safe)
+interface StructuredFields {
+  logoUrl: string;
+  caption: string;
+  captionPosition: string;
+  captionSize: number;
+  captionColor: string;
+  formats: CampaignFormat[];
+}
+
 function AgentContent() {
   const [command, setCommand] = useState("");
+  const [fields, setFields] = useState<StructuredFields>({
+    logoUrl: "",
+    caption: "",
+    captionPosition: "bottom",
+    captionSize: 48,
+    captionColor: "white",
+    formats: [],
+  });
   const [result, setResult] = useState<CommandResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [parsedCommand, setParsedCommand] = useState<ParsedCommand | null>(
-    null
-  );
+  const [parsedCommand, setParsedCommand] = useState<ParsedCommand | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const { isConnected } = useAccount();
+  const [brandKitId, setBrandKitId] = useState("");
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const toast = useToast();
   const searchParams = useSearchParams();
 
-  // Hydration-safe: read ?cmd= AFTER mount so SSR doesn't try to peek window.
   useEffect(() => {
     const cmdParam = searchParams?.get("cmd");
     if (cmdParam) {
       try {
         setCommand(decodeURIComponent(cmdParam));
       } catch {
-        // Malformed encoding — fall back to the raw value rather than crash.
         setCommand(cmdParam);
         toast.showError("Command in URL was malformed");
       }
@@ -84,57 +111,104 @@ function AgentContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Function to proxy image URLs if needed
+  const buildParameters = () => {
+    const parameters: Record<string, unknown> = {};
+
+    if (fields.logoUrl.trim()) {
+      parameters.logoUrl = fields.logoUrl.trim();
+    }
+
+    if (fields.caption.trim()) {
+      parameters.text = {
+        content: fields.caption.trim(),
+        position: fields.captionPosition,
+        fontSize: fields.captionSize,
+        color: fields.captionColor,
+        style: "bold",
+      };
+    }
+
+    if (fields.formats.length > 0) {
+      parameters.formats = fields.formats;
+    }
+
+    if (brandKitId) {
+      parameters.brandKitId = brandKitId;
+    }
+
+    return Object.keys(parameters).length > 0 ? parameters : undefined;
+  };
+
+  const studioUrl = useMemo(
+    () =>
+      result?.studioReviewUrl ||
+      buildStudioUrl({
+        draftId: result?.draftId,
+        brief: parsedCommand?.prompt || command,
+        logoUrl: fields.logoUrl.trim() || parsedCommand?.logoUrl,
+        caption: fields.caption.trim() || parsedCommand?.text?.content,
+        brandKitId: brandKitId || undefined,
+        autostart: !result?.draftId,
+      }),
+    [
+      parsedCommand,
+      command,
+      fields.logoUrl,
+      fields.caption,
+      brandKitId,
+      result?.draftId,
+      result?.studioReviewUrl,
+    ],
+  );
+
+  const handleLogoFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    void uploadLogoFile(file)
+      .then((url) => setFields((prev) => ({ ...prev, logoUrl: url })))
+      .catch(() => toast.showError("Logo upload failed"))
+      .finally(() => setIsUploadingLogo(false));
+  };
+
+  const applyBrandKit = (kit: BrandKit) => {
+    setBrandKitId(kit.id);
+    if (kit.logoUrl) {
+      setFields((prev) => ({ ...prev, logoUrl: kit.logoUrl ?? "" }));
+    }
+    if (kit.text?.content) {
+      setFields((prev) => ({
+        ...prev,
+        caption: kit.text?.content ?? prev.caption,
+        captionPosition: kit.text?.position ?? prev.captionPosition,
+        captionSize: kit.text?.fontSize ?? prev.captionSize,
+        captionColor: kit.text?.color ?? prev.captionColor,
+      }));
+    }
+    if (kit.formats?.length) {
+      setFields((prev) => ({ ...prev, formats: kit.formats ?? [] }));
+    }
+  };
+
   const getProxiedUrl = (url: string): string => {
-    // If it's an IPFS URL, proxy it
     if (url.startsWith("https://ipfs.io/ipfs/")) {
       return `/api/proxy?url=${encodeURIComponent(url)}`;
     }
     return url;
   };
 
-  // Function to get the best available image URL
-  const getBestImageUrl = (result: CommandResult): string => {
-    // Prefer Grove URL if available as it's more reliable
-    if (result.groveUrl) {
-      return result.groveUrl;
-    }
-    // Fall back to the result URL
-    return result.resultUrl || "";
-  };
+  const getBestImageUrl = (commandResult: CommandResult): string =>
+    commandResult.groveUrl || commandResult.resultUrl || "";
 
-  // Check if the command is a mantleify command
-  const isMantleifyCommand = (cmd: string): boolean => {
-    return cmd.toLowerCase().includes("mantleify");
-  };
-
-  // Check if the command is a scrollify command
-  const isScrollifyCommand = (cmd: string): boolean => {
-    return cmd.toLowerCase().includes("scrollify");
-  };
-
-  // Check if the command is using one of the Base NFT overlays
-  const getBaseOverlayType = (cmd: string): string | null => {
-    const lowerCmd = cmd.toLowerCase();
-    if (lowerCmd.includes("higherify")) return "higherify";
-    if (lowerCmd.includes("baseify")) return "baseify";
-    if (lowerCmd.includes("dickbuttify")) return "dickbuttify";
-    return null;
-  };
-
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setResult(null);
 
     try {
-      // Parse the command first
       const parseResponse = await fetch("/api/agent/parse", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command }),
       });
 
@@ -142,19 +216,28 @@ function AgentContent() {
         throw new Error(`Error: ${parseResponse.status}`);
       }
 
-      const parsedData = await parseResponse.json();
+      const parsedData = (await parseResponse.json()) as ParsedCommand;
+      if (fields.logoUrl.trim()) parsedData.logoUrl = fields.logoUrl.trim();
+      if (fields.caption.trim()) {
+        parsedData.text = {
+          content: fields.caption.trim(),
+          position: fields.captionPosition,
+          fontSize: fields.captionSize,
+          color: fields.captionColor,
+          style: "bold",
+        };
+      }
       setParsedCommand(parsedData);
       setShowConfirmation(true);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to parse command. Please try again."
+          : "Failed to parse command. Please try again.",
       );
     }
   };
 
-  // Handle confirmation
   const handleConfirm = async () => {
     if (!parsedCommand) return;
 
@@ -164,10 +247,11 @@ function AgentContent() {
     try {
       const response = await fetch("/api/agent", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ command }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command,
+          parameters: buildParameters(),
+        }),
       });
 
       if (!response.ok) {
@@ -175,11 +259,7 @@ function AgentContent() {
       }
 
       const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
+      if (data.error) throw new Error(data.error);
       setResult(data);
     } catch (err) {
       const errorMessage =
@@ -187,13 +267,12 @@ function AgentContent() {
           ? err.message
           : "Failed to process command. Please try again.";
 
-      // Check for timeout or cold start scenarios
       if (
         errorMessage.includes("504") ||
         errorMessage.includes("FUNCTION_INVOCATION_TIMEOUT")
       ) {
         setError(
-          "The server is warming up. Please try again in a few moments. This happens when the server hasn't been used for a while."
+          "The server is warming up. Please try again in a few moments.",
         );
       } else {
         setError(errorMessage);
@@ -204,194 +283,221 @@ function AgentContent() {
     }
   };
 
-  const handleCancel = () => {
-    setShowConfirmation(false);
-    setParsedCommand(null);
+  const toggleFormat = (format: CampaignFormat) => {
+    setFields((prev) => ({
+      ...prev,
+      formats: prev.formats.includes(format)
+        ? prev.formats.filter((f) => f !== format)
+        : [...prev.formats, format],
+    }));
   };
 
   return (
     <div className="container mx-auto p-4 max-w-3xl">
       <Navigation />
 
-      <div className="flex justify-center mb-4">
-        <WalletConnect />
-      </div>
-
-      <div className="flex justify-center mb-6">
+      <div className="text-center mb-6">
         <Image
           src="/wowwowowify.png"
-          alt="WOWOWIFY"
+          alt="@toka"
           width={200}
           height={200}
-          className="w-32 h-auto"
+          className="w-24 h-auto mx-auto mb-3"
           priority
         />
+        <h1
+          className="text-xl font-bold tracking-tight"
+          style={{ color: "var(--color-text)" }}
+        >
+          {STUDIO_COPY.command.title}
+        </h1>
+        <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
+          {STUDIO_COPY.command.subtitle}
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mb-8 text-center">
-        <div className="mb-4">
+      <form onSubmit={handleSubmit} className="mb-8 space-y-5">
+        <BrandKitPanel onLoad={applyBrandKit} compact />
+        <div>
           <label htmlFor="command" className="block text-sm font-medium mb-2">
-            Try
+            Campaign brief
           </label>
           <textarea
             id="command"
             value={command}
             onChange={(e) => setCommand(e.target.value)}
-            placeholder="e.g., Higherify a mountain landscape. Scale to 0.8."
-            className="w-full p-2 border rounded resize-none overflow-hidden text-center placeholder:text-center"
-            style={{
-              minHeight: "42px",
-              maxHeight: "150px",
-              height: "auto",
-              textAlign: "center",
-            }}
+            placeholder='e.g., Generate a futuristic launch visual with bold lighting'
+            className="w-full p-3 border rounded-lg resize-none min-h-[80px] text-sm surface"
             required
-            rows={Math.min(5, Math.max(1, command.split("\n").length))}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              // Reset height to auto to get the correct scrollHeight
-              target.style.height = "auto";
-              // Set the height to the scrollHeight to expand the textarea
-              target.style.height = `${Math.min(150, target.scrollHeight)}px`;
-            }}
+            rows={3}
           />
         </div>
-        <button
-          type="submit"
-          disabled={loading || showConfirmation}
-          className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
-        >
-          {loading ? "Processing..." : "wowow"}
-        </button>
+
+        <div>
+          <label htmlFor="logoUrl" className="block text-sm font-medium mb-2">
+            Brand mark URL <span className="font-normal opacity-60">(optional)</span>
+          </label>
+          <input
+            id="logoUrl"
+            type="url"
+            value={fields.logoUrl}
+            onChange={(e) =>
+              setFields((prev) => ({ ...prev, logoUrl: e.target.value }))
+            }
+            placeholder="https://example.com/logo.png"
+            className="w-full p-3 border rounded-lg text-sm surface"
+          />
+          <p className="text-xs mt-1" style={{ color: "var(--color-text-secondary)" }}>
+            Public HTTPS URL — or upload a file to get a persistent Blob URL.
+          </p>
+          <label className="mt-2 inline-block px-3 py-2 text-xs surface rounded-lg cursor-pointer">
+            {isUploadingLogo ? "Uploading…" : "Upload logo file"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              onChange={handleLogoFile}
+              className="hidden"
+            />
+          </label>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label htmlFor="caption" className="block text-sm font-medium mb-2">
+              Campaign copy <span className="font-normal opacity-60">(optional)</span>
+            </label>
+            <input
+              id="caption"
+              type="text"
+              value={fields.caption}
+              onChange={(e) =>
+                setFields((prev) => ({ ...prev, caption: e.target.value }))
+              }
+              placeholder="THE FUTURE SHIPS TODAY"
+              className="w-full p-3 border rounded-lg text-sm surface"
+            />
+          </div>
+          <div>
+            <label htmlFor="captionPosition" className="block text-xs font-medium mb-1">
+              Position
+            </label>
+            <select
+              id="captionPosition"
+              value={fields.captionPosition}
+              onChange={(e) =>
+                setFields((prev) => ({ ...prev, captionPosition: e.target.value }))
+              }
+              className="w-full p-2 border rounded-lg text-sm surface"
+            >
+              <option value="bottom">Bottom</option>
+              <option value="top">Top</option>
+              <option value="center">Center</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="captionSize" className="block text-xs font-medium mb-1">
+              Size: {fields.captionSize}px
+            </label>
+            <input
+              id="captionSize"
+              type="range"
+              min="24"
+              max="96"
+              value={fields.captionSize}
+              onChange={(e) =>
+                setFields((prev) => ({
+                  ...prev,
+                  captionSize: parseInt(e.target.value, 10),
+                }))
+              }
+              className="w-full accent-current"
+            />
+          </div>
+        </div>
+
+        <div>
+          <FormatSelector
+            selected={fields.formats}
+            onToggle={toggleFormat}
+          />
+        </div>
+
+        <div className="flex justify-center">
+          <button
+            type="submit"
+            disabled={loading || showConfirmation}
+            className="px-6 py-2.5 text-white rounded-lg font-medium transition-opacity disabled:opacity-50"
+            style={{ backgroundColor: "var(--color-wowowify)" }}
+          >
+            {loading ? "Processing…" : STUDIO_COPY.command.preview}
+          </button>
+        </div>
       </form>
 
       {loading && (
-        <div className="p-4 mb-4 bg-white rounded border text-center">
+        <div className="p-4 mb-4 surface rounded-lg text-center">
           <LoadingIndicator />
         </div>
       )}
 
       {error && (
-        <div className="p-4 mb-4 bg-red-100 border border-red-400 text-red-700 rounded text-center">
+        <div className="p-4 mb-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center">
           {error}
         </div>
       )}
 
       {showConfirmation && parsedCommand && (
-        <div className="p-4 mb-4 bg-gray-100 rounded border">
-          <h2 className="text-xl font-semibold mb-4 text-center">Confirm</h2>
-          <div className="mb-4">
-            <p className="mb-2 text-center">
-              <strong>I understood</strong>
-            </p>
-            <div className="bg-white p-3 rounded border mb-4">
-              {parsedCommand.action === "generate" && (
-                <div>
-                  <p className="mb-2 text-center">Generate an image of:</p>
-                  <p className="text-center font-medium">
-                    {parsedCommand.prompt || "No prompt provided"}
-                  </p>
-                  {parsedCommand.overlayMode && (
-                    <p className="mt-2 text-center text-blue-600">
-                      Using{" "}
-                      <span className="font-medium">
-                        {parsedCommand.overlayMode}
-                      </span>{" "}
-                      overlay
-                    </p>
-                  )}
-                </div>
-              )}
-              {parsedCommand.action === "overlay" && (
-                <div>
-                  <p className="mb-2 text-center">
-                    Apply the{" "}
-                    <span className="font-medium">
-                      {parsedCommand.overlayMode || "default"}
-                    </span>{" "}
-                    overlay to{" "}
-                    {parsedCommand.prompt
-                      ? "an image of:"
-                      : "the generated image"}
-                  </p>
-                  {parsedCommand.prompt && (
-                    <p className="text-center font-medium">
-                      {parsedCommand.prompt}
-                    </p>
-                  )}
-                </div>
-              )}
-              {parsedCommand.controls && (
-                <div className="mt-4 pt-4 border-t">
-                  <p className="mb-2 text-center">With these adjustments:</p>
-                  <ul className="text-sm">
-                    {parsedCommand.controls.scale !== undefined && (
-                      <li className="text-center">
-                        Scale: {parsedCommand.controls.scale}
-                      </li>
-                    )}
-                    {parsedCommand.controls.x !== undefined &&
-                      parsedCommand.controls.y !== undefined && (
-                        <li className="text-center">
-                          Position: {parsedCommand.controls.x},{" "}
-                          {parsedCommand.controls.y}
-                        </li>
-                      )}
-                    {parsedCommand.controls.overlayColor && (
-                      <li className="text-center">
-                        Color: {parsedCommand.controls.overlayColor}
-                      </li>
-                    )}
-                    {parsedCommand.controls.overlayAlpha !== undefined && (
-                      <li className="text-center">
-                        Opacity: {parsedCommand.controls.overlayAlpha}
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-              {parsedCommand.text && (
-                <div className="mt-4 pt-4 border-t">
-                  <p className="mb-2 text-center">With text:</p>
-                  <p className="text-center font-medium">
-                    &ldquo;{parsedCommand.text.content}&rdquo;
-                  </p>
-                  <ul className="text-sm mt-2">
-                    {parsedCommand.text.position && (
-                      <li className="text-center">
-                        Position: {parsedCommand.text.position}
-                      </li>
-                    )}
-                    {parsedCommand.text.fontSize !== undefined && (
-                      <li className="text-center">
-                        Size: {parsedCommand.text.fontSize}
-                      </li>
-                    )}
-                    {parsedCommand.text.color && (
-                      <li className="text-center">
-                        Color: {parsedCommand.text.color}
-                      </li>
-                    )}
-                    {parsedCommand.text.style && (
-                      <li className="text-center">
-                        Style: {parsedCommand.text.style}
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-            </div>
+        <div className="p-4 mb-4 surface rounded-lg border">
+          <h2 className="text-lg font-semibold mb-4 text-center">Confirm</h2>
+          <div className="bg-white dark:bg-gray-900 p-3 rounded-lg border mb-4 text-sm space-y-2">
+            {parsedCommand.prompt && (
+              <p>
+                <strong>Brief:</strong> {parsedCommand.prompt}
+              </p>
+            )}
+            {parsedCommand.logoUrl && (
+              <p>
+                <strong>Brand mark:</strong>{" "}
+                <span className="break-all">{parsedCommand.logoUrl}</span>
+              </p>
+            )}
+            {parsedCommand.overlayMode && (
+              <p>
+                <strong>Preset:</strong> {parsedCommand.overlayMode}
+              </p>
+            )}
+            {parsedCommand.text?.content && (
+              <p>
+                <strong>Campaign copy:</strong> &ldquo;{parsedCommand.text.content}&rdquo;
+              </p>
+            )}
+            {fields.formats.length > 0 && (
+              <p>
+                <strong>Formats:</strong> {fields.formats.join(", ")}
+              </p>
+            )}
           </div>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-3">
             <button
               onClick={handleConfirm}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
-              Yes, do it!
+              Create artwork
             </button>
+            <Link
+              href={studioUrl}
+              className="px-4 py-2 surface rounded-lg hover:shadow-md"
+              style={{ color: "var(--color-wowowify)" }}
+            >
+              {STUDIO_COPY.command.openStudio}
+            </Link>
             <button
-              onClick={handleCancel}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              onClick={() => {
+                setShowConfirmation(false);
+                setParsedCommand(null);
+              }}
+              className="px-4 py-2 surface rounded-lg"
+              style={{ color: "var(--color-text-secondary)" }}
             >
               Cancel
             </button>
@@ -400,130 +506,108 @@ function AgentContent() {
       )}
 
       {result && (
-        <div className="p-4 mb-8 bg-white rounded border">
-          <h2 className="text-xl font-semibold mb-4 text-center">Result</h2>
-          {result.status === "completed" && result.resultUrl && (
+        <div className="p-4 mb-8 surface rounded-lg border">
+          <h2 className="text-lg font-semibold mb-4 text-center">Result</h2>
+          {result.status === "completed" && result.draftId && (
+            <div className="mb-4 p-3 rounded-lg border text-sm space-y-2">
+              <p>
+                <strong>Draft ID:</strong>{" "}
+                <code className="text-xs break-all">{result.draftId}</code>
+              </p>
+              {result.studioReviewUrl && (
+                <Link
+                  href={result.studioReviewUrl}
+                  className="inline-block px-4 py-2 text-white rounded-lg"
+                  style={{ backgroundColor: "var(--color-wowowify)" }}
+                >
+                  Open in Studio for approval
+                </Link>
+              )}
+            </div>
+          )}
+          {result.status === "completed" && result.assets && result.assets.length > 0 && (
+            <div className="grid sm:grid-cols-3 gap-3 mb-4">
+              {result.assets.map((asset) => {
+                const url = asset.resultUrl || asset.previewUrl;
+                if (!url) return null;
+                return (
+                  <div key={asset.format} className="text-center">
+                    <p className="text-xs mb-1 capitalize">{asset.format}</p>
+                    <div className="relative w-full aspect-square mb-2">
+                      <Image
+                        src={getProxiedUrl(url)}
+                        alt={`${asset.format} artwork`}
+                        fill
+                        className="object-contain rounded-lg border"
+                        unoptimized
+                      />
+                    </div>
+                    <a
+                      href={url}
+                      download={`toka-${asset.format}.png`}
+                      className="text-xs underline"
+                    >
+                      Export {asset.format}
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {result.status === "completed" && result.resultUrl && !result.assets?.length && (
             <div className="flex flex-col items-center">
               <div className="relative w-full max-w-md mb-4">
                 <Image
                   src={getProxiedUrl(getBestImageUrl(result))}
-                  alt="Generated image"
+                  alt="Generated artwork"
                   width={512}
                   height={512}
-                  className="w-full h-auto rounded border"
+                  className="w-full h-auto rounded-lg border"
                 />
               </div>
               <a
                 href={getBestImageUrl(result)}
                 download
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mb-4"
+                className="px-4 py-2 text-white rounded-lg mb-4"
+                style={{ backgroundColor: "var(--color-wowowify)" }}
               >
-                Download
+                Export
               </a>
-              <p className="text-sm text-gray-500 text-center">
-                Note: Images are stored temporarily. Download to keep.
+              <p className="text-sm text-center" style={{ color: "var(--color-text-secondary)" }}>
+                Download to keep — temporary URLs may expire.
               </p>
-
-              {result.groveUri && result.groveUrl && (
-                <div className="mt-4 text-center">
-                  <a
-                    href={result.groveUrl || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-600 hover:text-purple-800 underline"
-                  >
-                    Grove
-                  </a>
-
-                  {/* Add Mint as NFT button for mantleify images */}
-                  {isMantleifyCommand(command) &&
-                    result.groveUrl &&
-                    isConnected && (
-                      <div className="mt-2">
-                        <MintMantleifyButton groveUrl={result.groveUrl} />
-                      </div>
-                    )}
-
-                  {/* Add Mint as NFT button for Base NFT overlays */}
-                  {getBaseOverlayType(command) &&
-                    result.groveUrl &&
-                    isConnected && (
-                      <div className="mt-2">
-                        <MintBaseNFTButton
-                          groveUrl={result.groveUrl}
-                          overlayType={getBaseOverlayType(command)!}
-                        />
-                      </div>
-                    )}
-
-                  {/* Add Mint as NFT button for scrollify images */}
-                  {isScrollifyCommand(command) &&
-                    result.groveUrl &&
-                    isConnected && (
-                      <div className="mt-2">
-                        <MintScrollifyNFTButton groveUrl={result.groveUrl} />
-                      </div>
-                    )}
-                </div>
-              )}
             </div>
           )}
           {result.status === "failed" && (
-            <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded text-center">
+            <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center">
               {result.error || "Failed to process the command"}
             </div>
           )}
         </div>
       )}
 
-      <div className="mb-8 p-4 bg-gray-50 rounded border text-center">
-        <h2 className="text-lg font-semibold mb-3">How</h2>
-        <div className="flex flex-col gap-2 max-w-md mx-auto">
-          <div className="p-2 bg-white rounded border">
-            <strong className="text-blue-600">Basic:</strong> &ldquo;higherify a
-            cat&rdquo;
-          </div>
-          <div className="p-2 bg-white rounded border">
-            <strong className="text-blue-600">Placement:</strong>{" "}
-            &ldquo;Position at 20, -30&rdquo;
-          </div>
-          <div className="p-2 bg-white rounded border">
-            <strong className="text-blue-600">Size:</strong> &ldquo;Scale to
-            0.5&rdquo;
-          </div>
-          <div className="p-2 bg-white rounded border">
-            <strong className="text-blue-600">Style:</strong> &ldquo;Color to
-            #0000FF&rdquo;
-          </div>
-        </div>
-        <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200 text-blue-800 text-sm max-w-md mx-auto">
-          <strong>Supported overlays:</strong>{" "}
-          <span className="font-mono">degen</span>,{" "}
-          <span className="font-mono">higher</span>,{" "}
-          <span className="font-mono">scroll</span>,{" "}
-          <span className="font-mono">lens</span>,{" "}
-          <span className="font-mono">dickbutt</span>,{" "}
-          <span className="font-mono">nikefy</span>,{" "}
-          <span className="font-mono">noun</span>,{" "}
-          <span className="font-mono">base</span>,{" "}
-          <span className="font-mono">mantle</span>
-        </div>
-        <div className="mt-3 p-3 bg-yellow-50 rounded border border-yellow-200 text-yellow-800 text-sm max-w-md mx-auto">
-          <strong>Tip:</strong> Separate commands with periods for better
-          results:
-          <br />
-          <span className="font-mono text-xs mt-1 block">
-            Higherify a dog. Opacity 0.3. Color green.
+      <div className="mb-8 p-4 surface rounded-lg border text-sm space-y-3">
+        <h2 className="text-base font-semibold">Examples</h2>
+        <p style={{ color: "var(--color-text-secondary)" }}>
+          <strong>Brand campaign:</strong>{" "}
+          <span className="font-mono text-xs">
+            Generate a product launch visual. Scale to 0.5. --text &quot;SHIPS TODAY&quot;
           </span>
-        </div>
+        </p>
+        <p style={{ color: "var(--color-text-secondary)" }}>
+          <strong>With logo URL:</strong> add a public logo URL above, or use{" "}
+          <span className="font-mono text-xs">POST /api/agent</span> with{" "}
+          <span className="font-mono text-xs">parameters.logoUrl</span>.
+        </p>
+        <p style={{ color: "var(--color-text-secondary)" }}>
+          See <code className="text-xs">docs/TOKA_GUIDE.md</code> in the repo for Farcaster bot syntax and community preset names.
+        </p>
       </div>
     </div>
   );
 }
 
 export default function AgentPage() {
-  // Suspense boundary is REQUIRED for useSearchParams in Next.js 15 —
-  // without it, the entire page bails to client-side rendering.
   return (
     <Suspense fallback={<LoadingIndicator />}>
       <AgentContent />

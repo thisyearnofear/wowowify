@@ -4,7 +4,7 @@
  * Extracted from src/lib/services/command-router.ts to drop that module below
  * the 250-LOC budget. Pure functions — no class wrapper, no module state.
  *
- * Scope: ONLY the base-image download path with its Farcaster
+ * Scope: remote-image downloads for base images and exact brand marks, with Farcaster
  * imagedelivery.net special-casing. Does not touch Venice, overlays, or canvas.
  *
  * Caller owns the AbortSignal composition (CommandRouter's processCommand
@@ -22,7 +22,7 @@ import { logger } from "@/lib/logger";
  *   - buffer payload < 100 bytes (likely invalid)
  *   - URL special-casing arithmetic failure
  *
- * The caller (`CommandRouter.acquireBaseImage`) is responsible for the
+ * The caller is responsible for the
  * AbortSignal lifecycle + feeding errors back through `processCommand`'s
  * try/catch.
  */
@@ -80,7 +80,7 @@ export async function downloadImage(
       url: imageUrl.substring(0, 100),
     });
     throw new Error(
-      `Failed to download base image: ${
+      `Failed to download image: ${
         error instanceof Error ? error.message : "Unknown error"
       }`,
     );

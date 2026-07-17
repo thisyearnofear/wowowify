@@ -2,15 +2,70 @@
 
 ## What is @toka?
 
-@toka is an AI-powered image generation and manipulation bot that works across three interfaces:
+@toka is an agentic brand studio that combines generative imagery with exact logo and text composition. It helps agents and people turn a creative brief into publication-ready social artwork without asking an image model to redraw or distort the supplied brand mark.
 
-- **Farcaster Bot**: Mention @toka in your casts to generate or modify images
-- **Farcaster Frame**: Interact with @toka directly in Farcaster clients
-- **Web Interface**: Visit [wowowify.vercel.app](https://wowowify.vercel.app) for the full experience
+@toka works through two equal production interfaces and one distribution channel:
 
-## Command Structure
+- **Studio for people**: Visit [wowowify.vercel.app](https://wowowify.vercel.app) to create, inspect, refine, and share artwork.
+- **Service for agents**: Call `POST /api/agent` to create the same artwork programmatically.
+- **Farcaster distribution**: Mention @toka or open the Mini App to start a composition from Farcaster.
 
-@toka understands natural language commands in two main categories:
+The Studio supports bring-your-own-logo composition. External agents can provide a public `logoUrl` to `POST /api/agent`, upload a logo first via `POST /api/upload-logo`, or reference a saved `brandKitId`. Community overlays remain available as quick-start presets. Agents can hand a draft to a person for final review in Studio.
+
+Wallet interaction is optional and reserved for a future X Layer campaign payment, entitlement, or delivery receipt. It is not required to create or share artwork.
+
+## Agent API (preferred for bots)
+
+Discover the service card at `GET /api/agent` or `GET /.well-known/agent.json`.
+
+### Brand kit + logo (recommended)
+
+```bash
+curl -X POST https://your-asp-host/api/agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command": "Generate a vibrant community launch visual",
+    "parameters": {
+      "brandKitId": "lisk-launch",
+      "formats": ["square", "landscape", "portrait"],
+      "text": {
+        "content": "THE FUTURE SHIPS TODAY",
+        "position": "bottom",
+        "style": "bold"
+      }
+    }
+  }'
+```
+
+### Logo URL or upload
+
+1. **Public URL** — pass `parameters.logoUrl` (HTTPS).
+2. **Upload first** — `POST /api/upload-logo` with multipart field `logo`, then use returned `logoUrl` in `POST /api/agent`.
+
+`logoUrl` always wins over community preset stamps — the mark is composited exactly, never redrawn.
+
+### Human approval drafts
+
+Successful `POST /api/agent` responses include:
+
+- `draftId` — persisted review record (7-day TTL)
+- `studioReviewUrl` — open in Studio, e.g. `/?draftId=…`
+
+Fetch draft details with `GET /api/drafts/{id}` (brief, kit, logo, copy, formats, preview URL).
+
+### Multi-format export
+
+Pass `parameters.formats`: `square`, `landscape`, `portrait`, `story`, `banner`. Response includes an `assets` array. Studio and the Mini App can download a single ZIP when multiple formats are selected.
+
+### Optional commerce & provenance
+
+- **x402** — set `X402_ENABLED=true` on ASP; paid calls require `X-PAYMENT` header (402 challenge otherwise).
+- **X Layer entitlements** — `POST /api/entitlements/xlayer` with `{ "draftId": "…" }` records an optional delivery receipt stub.
+- **Lisk provenance** — `POST /api/provenance` with `{ "draftId": "…" }` returns an off-chain specHash + assetHash receipt (no source logos onchain).
+
+## Farcaster bot commands
+
+@toka on Farcaster still accepts natural language in two main categories:
 
 ### 1. Generate New Images
 
@@ -30,7 +85,9 @@ Reply to a cast containing an image with:
 @toka higherify
 ```
 
-## Available Overlays
+## Community preset reference
+
+These preset names work in Farcaster commands or as `parameters.overlayMode` in the agent API. Prefer `brandKitId` + `logoUrl` for brand-safe campaigns.
 
 - `wowowify` - No overlay stamp — generates an AI image only (use with a color tint for background effects)
 - `degenify` - Degen-style overlay
@@ -215,42 +272,22 @@ For more detailed documentation, visit [wowowify.vercel.app/docs](https://wowowi
 
 ## For Other Bots/Agents
 
-If you're a bot or agent wanting to interact with @toka, here are some tips:
+If you're a bot or agent integrating with @toka programmatically:
 
-### Best Practices for Bot-to-Bot Interaction
+1. **Start with `brandKitId` + optional `logoUrl`** — see [Agent API](#agent-api-preferred-for-bots) above.
+2. **Persist drafts for humans** — share `studioReviewUrl` from the agent response; no Farcaster or wallet required.
+3. **Upload logos** when you don't have a public URL — `POST /api/upload-logo` → use returned `logoUrl`.
+4. **Use Farcaster syntax** only when posting casts — the pipe/colon rules below apply to @toka mentions, not `POST /api/agent`.
 
-1. **Use Simple, Clear Commands**: Start with basic commands before trying complex ones
+### Farcaster syntax rules (casts only)
 
-   ```
-   @toka generate a mountain landscape
-   @toka degenify this image
-   ```
+- Use periods (`.`) to separate parameters, not pipes (`|`)
+- Use `to` or `at` with parameters, not colons (`:`)
+- Use `scale` instead of `size`
+- Use `color` instead of `style` for color adjustments
+- Always quote text: `--text "Your text here"`
 
-2. **Follow the Syntax Rules Strictly**:
-
-   - Use periods (`.`) to separate parameters, not pipes (`|`)
-   - Use `to` or `at` with parameters, not colons (`:`)
-   - Use `scale` instead of `size`
-   - Use `color` instead of `style` for color adjustments
-
-3. **When Replying to Images**:
-
-   - Make it clear you're referring to the image: "this image", "this", etc.
-   - Keep your description brief when applying overlays
-
-4. **For Text Parameters**:
-
-   - The `--text` parameter format is correct and works well
-   - Always use quotes around text content: `--text "Your text here"`
-
-5. **Handling Responses**:
-   - @toka will reply with the processed image and a brief message
-   - The image will be stored on Grove for persistence
-   - You can reference the image URL in future interactions
-
-### Example Bot-to-Bot Interactions
-
-**Scenario 1: Commenting on an image and requesting an overlay**
+### Example cast interactions
 
 ```
 @toka This landscape photo is beautiful! The mountains and sky create a perfect harmony.

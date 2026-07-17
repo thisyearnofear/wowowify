@@ -1,10 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import debounce from "lodash/debounce";
 import { InitialStage } from "./stages/InitialStage";
 import { StyleStage } from "./stages/StyleStage";
 import { AdjustStage } from "./stages/AdjustStage";
 import { GenerateModal } from "./modals/GenerateModal";
 import { LoadingText } from "./LoadingText";
+import { StudioStepper } from "./studio/StudioStepper";
+import { BrandKitPanel, type BrandKitDefaults } from "./studio/BrandKitPanel";
+import type { BrandKit } from "@/lib/brand-kits";
+import type { CampaignFormat } from "@/lib/agent-types";
+import type { CampaignDraft } from "@/lib/campaign-drafts";
+import { cropCanvasToFormat, triggerDownload } from "@/lib/campaign-formats";
+import { buildZipFromDataUrls, triggerZipDownload } from "@/lib/export-zip";
+import { uploadLogoFile } from "@/lib/upload-logo-client";
 import {
   OverlayMode,
   PRESET_OVERLAY_PATHS,
@@ -44,8 +53,20 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines;
 }
 
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
 export default function ImageOverlay() {
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const pendingLogoUrlRef = useRef<string | null>(null);
+  const didAutostartRef = useRef(false);
   // Tracks every URL.createObjectURL we mint so we can revoke on unmount,
   // on preset swap, and on "start over". Previously the cleanup-return-
   // from-handler anti-pattern caused leaks across mode switches.
@@ -92,6 +113,249 @@ export default function ImageOverlay() {
     color: "white",
     style: "bold",
   });
+  const [exportFormats, setExportFormats] = useState<CampaignFormat[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
+  const [savedLogoUrl, setSavedLogoUrl] = useState<string | undefined>();
+
+  const applyBrandKitDefaults = useCallback((kit: BrandKit | BrandKitDefaults) => {
+    if (kit.text) {
+      setTextControls((prev) => ({
+        ...prev,
+        content: kit.text?.content ?? prev.content,
+        position: kit.text?.position ?? prev.position,
+        fontSize: kit.text?.fontSize ?? prev.fontSize,
+        color: kit.text?.color ?? prev.color,
+        style: kit.text?.style ?? prev.style,
+      }));
+    }
+    if (kit.controls) {
+      setControls((prev) => ({
+        ...prev,
+        scale: kit.controls?.scale ?? prev.scale,
+        x: kit.controls?.x ?? prev.x,
+        y: kit.controls?.y ?? prev.y,
+        overlayColor: kit.controls?.overlayColor ?? prev.overlayColor,
+        overlayAlpha: kit.controls?.overlayAlpha ?? prev.overlayAlpha,
+      }));
+    }
+    if (kit.formats?.length) {
+      setExportFormats(kit.formats);
+    }
+    if (kit.logoUrl) {
+      pendingLogoUrlRef.current = kit.logoUrl;
+      setSavedLogoUrl(kit.logoUrl);
+    }
+  }, []);
+
+  const replaceOverlayImage = useCallback((file: File | null) => {
+    setOverlayImage(file);
+    setOverlayPreviewUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+        activeObjectUrlsRef.current.delete(currentUrl);
+      }
+      return file ? trackObjectUrl(URL.createObjectURL(file)) : "";
+    });
+  }, [trackObjectUrl]);
+
+  const applyLogoFromUrl = useCallback(
+    async (logoUrl: string) => {
+      try {
+        const response = await fetch(
+          `/api/fetch-image?url=${encodeURIComponent(logoUrl)}`,
+        );
+        if (!response.ok) throw new Error("Could not fetch logo");
+        const blob = await response.blob();
+        const file = new File([blob], "brand-logo.png", {
+          type: blob.type || "image/png",
+        });
+        setMode("wowowify");
+        replaceOverlayImage(file);
+        setStage("adjust");
+      } catch {
+        toast.showError("Could not load logo from URL");
+      }
+    },
+    [replaceOverlayImage, toast],
+  );
+
+  const loadBaseFromUrl = useCallback(
+    async (imageUrl: string) => {
+      const response = await fetch(
+        `/api/fetch-image?url=${encodeURIComponent(imageUrl)}`,
+      );
+      if (!response.ok) throw new Error("Could not fetch preview");
+      const blob = await response.blob();
+      const file = new File([blob], "campaign-preview.png", {
+        type: blob.type || "image/png",
+      });
+      setBaseImage(file);
+      setBasePreviewUrl(trackObjectUrl(URL.createObjectURL(file)));
+    },
+    [trackObjectUrl],
+  );
+
+  const generateImage = useCallback(
+    async (promptOverride?: string) => {
+      const prompt = (promptOverride ?? generationPrompt).trim();
+      if (!prompt) return;
+
+      setIsGenerating(true);
+      try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            model: "stable-diffusion-3.5",
+            hide_watermark: true,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to generate visual");
+        }
+
+        if (data.images?.[0]) {
+          const base64 = data.images[0];
+          const byteCharacters = atob(base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "image/png" });
+          const file = new File([blob], "generated-image.png", {
+            type: "image/png",
+          });
+          setBaseImage(file);
+          setBasePreviewUrl(trackObjectUrl(URL.createObjectURL(file)));
+          setGenerationPrompt("");
+          setIsGenerating(false);
+          setShowGenerateModal(false);
+          setStage("style");
+        }
+      } catch (error) {
+        toast.showError(
+          error instanceof Error ? error.message : "Failed to generate visual",
+        );
+        setGenerationPrompt("");
+        setIsGenerating(false);
+        setShowGenerateModal(false);
+      }
+    },
+    [generationPrompt, toast, trackObjectUrl],
+  );
+
+  useEffect(() => {
+    const draftId = searchParams?.get("draftId");
+    if (draftId) {
+      void (async () => {
+        try {
+          const response = await fetch(
+            `/api/drafts/${encodeURIComponent(draftId)}`,
+          );
+          const data = (await response.json()) as {
+            draft?: CampaignDraft;
+            error?: string;
+          };
+          if (!response.ok || !data.draft) {
+            toast.showError(data.error || "Draft not found");
+            return;
+          }
+
+          const draft = data.draft;
+          if (draft.brief) setGenerationPrompt(draft.brief);
+          if (draft.text) {
+            setTextControls((prev) => ({
+              ...prev,
+              content: draft.text?.content ?? prev.content,
+              position: draft.text?.position ?? prev.position,
+              fontSize: draft.text?.fontSize ?? prev.fontSize,
+              color: draft.text?.color ?? prev.color,
+              style: draft.text?.style ?? prev.style,
+            }));
+          }
+          if (draft.controls) {
+            setControls((prev) => ({
+              ...prev,
+              scale: draft.controls?.scale ?? prev.scale,
+              x: draft.controls?.x ?? prev.x,
+              y: draft.controls?.y ?? prev.y,
+              overlayColor: draft.controls?.overlayColor ?? prev.overlayColor,
+              overlayAlpha: draft.controls?.overlayAlpha ?? prev.overlayAlpha,
+            }));
+          }
+          if (draft.formats?.length) setExportFormats(draft.formats);
+          if (draft.brandKitId) {
+            void fetch(`/api/brand-kits/${draft.brandKitId}`)
+              .then((kitResponse) => kitResponse.json())
+              .then((kitData: { kit?: BrandKit }) => {
+                if (kitData.kit) applyBrandKitDefaults(kitData.kit);
+              })
+              .catch(() => toast.showError("Could not load brand kit"));
+          }
+          if (draft.logoUrl) {
+            pendingLogoUrlRef.current = draft.logoUrl;
+            setSavedLogoUrl(draft.logoUrl);
+          }
+
+          const preview = draft.previewUrl || draft.resultUrl;
+          if (preview) {
+            await loadBaseFromUrl(preview);
+            setStage("style");
+          }
+        } catch {
+          toast.showError("Could not load draft");
+        }
+      })();
+      return;
+    }
+
+    const brief = searchParams?.get("brief");
+    const caption = searchParams?.get("caption");
+    const logoUrl = searchParams?.get("logoUrl");
+    const brandKitId = searchParams?.get("brandKitId");
+    const autostart = searchParams?.get("autostart") === "1";
+
+    if (caption) {
+      setTextControls((prev) => ({ ...prev, content: caption }));
+    }
+
+    if (logoUrl) {
+      pendingLogoUrlRef.current = logoUrl;
+      setSavedLogoUrl(logoUrl);
+    }
+
+    if (brandKitId) {
+      void fetch(`/api/brand-kits/${brandKitId}`)
+        .then((response) => response.json())
+        .then((data: { kit?: BrandKit }) => {
+          if (data.kit) applyBrandKitDefaults(data.kit);
+        })
+        .catch(() => toast.showError("Could not load brand kit"));
+    }
+
+    if (brief) {
+      setGenerationPrompt(brief);
+      if (autostart && !didAutostartRef.current) {
+        didAutostartRef.current = true;
+        void generateImage(brief);
+      } else {
+        setShowGenerateModal(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const logoUrl = pendingLogoUrlRef.current;
+    if (logoUrl && baseImage && stage === "style") {
+      pendingLogoUrlRef.current = null;
+      void applyLogoFromUrl(logoUrl);
+    }
+  }, [baseImage, stage, applyLogoFromUrl]);
 
   const handleBaseImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,6 +365,19 @@ export default function ImageOverlay() {
     setBaseImage(file);
     setBasePreviewUrl(trackObjectUrl(URL.createObjectURL(file)));
     setStage("style");
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setMode("wowowify");
+    replaceOverlayImage(file);
+    setStage("adjust");
+
+    void uploadLogoFile(file)
+      .then((logoUrl) => setSavedLogoUrl(logoUrl))
+      .catch(() => toast.showError("Logo uploaded locally but could not persist URL"));
   };
 
   const loadPresetOverlay = async (presetMode: OverlayMode) => {
@@ -159,8 +436,7 @@ export default function ImageOverlay() {
     }
 
     if (presetMode === "wowowify") {
-      setOverlayImage(null);
-      setOverlayPreviewUrl("");
+      replaceOverlayImage(null);
       setStage("adjust");
       return;
     }
@@ -213,8 +489,7 @@ export default function ImageOverlay() {
         };
 
         const processedFile = await handleOverlayFile(file);
-        setOverlayImage(processedFile);
-        setOverlayPreviewUrl(trackObjectUrl(URL.createObjectURL(processedFile)));
+        replaceOverlayImage(processedFile);
         setStage("adjust");
       } catch (error) {
         console.error("Error loading preset overlay:", error);
@@ -350,18 +625,58 @@ export default function ImageOverlay() {
     }
   }, [baseImage, overlayImage, controls.overlayAlpha, debouncedCombineImages]);
 
-  const handleDownload = () => {
-    if (!combinedPreviewUrl) return;
-    const link = document.createElement("a");
-    link.href = combinedPreviewUrl;
-    link.download = "combined-image.png";
-    link.click();
+  const handleDownload = async () => {
+    const sourceUrl = combinedPreviewUrl || basePreviewUrl;
+    if (!sourceUrl) return;
+
+    setIsExporting(true);
+    try {
+      const img = await loadImageElement(sourceUrl);
+      if (exportFormats.length === 0) {
+        triggerDownload(sourceUrl, "toka-artwork.png");
+        return;
+      }
+
+      const files = exportFormats.map((format) => {
+        const canvas = cropCanvasToFormat(img, img.width, img.height, format);
+        return {
+          filename: `toka-${format}.png`,
+          dataUrl: canvas.toDataURL("image/png"),
+        };
+      });
+
+      if (files.length > 1) {
+        const zip = await buildZipFromDataUrls(files);
+        triggerZipDownload(zip, "toka-campaign.zip");
+        return;
+      }
+
+      triggerDownload(files[0].dataUrl, files[0].filename);
+    } catch {
+      toast.showError("Export failed");
+    } finally {
+      setIsExporting(false);
+    }
   };
+
+  const toggleExportFormat = (format: CampaignFormat) => {
+    setExportFormats((current) =>
+      current.includes(format)
+        ? current.filter((entry) => entry !== format)
+        : [...current, format],
+    );
+  };
+
+  const getBrandKitPayload = (): BrandKitDefaults | null => ({
+    logoUrl: savedLogoUrl,
+    text: textControls,
+    controls,
+    formats: exportFormats.length ? exportFormats : undefined,
+  });
 
   const handleBack = () => {
     if (stage === "adjust") {
-      setOverlayImage(null);
-      setOverlayPreviewUrl("");
+      replaceOverlayImage(null);
       setStage("style");
     } else if (stage === "style") {
       // Returning to initial: free every preview URL we've minted so far
@@ -401,81 +716,21 @@ export default function ImageOverlay() {
     setTextControls((prev) => ({ ...prev, [key]: value }));
   };
 
-  const generateImage = async () => {
-    if (!generationPrompt) return;
-
-    setIsGenerating(true);
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: generationPrompt,
-          model: "stable-diffusion-3.5",
-          hide_watermark: true,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to wowowify");
-      }
-
-      if (data.images?.[0]) {
-        const base64 = data.images[0];
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: "image/png" });
-
-        const file = new File([blob], "generated-image.png", {
-          type: "image/png",
-        });
-        setBaseImage(file);
-        const url = URL.createObjectURL(file);
-        setBasePreviewUrl(url);
-        cleanupGenerationState();
-        setStage("style");
-      }
-    } catch (error) {
-      console.error("Error generating image:", error);
-      toast.showError(
-        error instanceof Error ? error.message : "Failed to wowowify",
-      );
-      cleanupGenerationState();
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   return (
     <div className="flex flex-col items-center gap-4 p-2 sm:p-4">
       <div className="w-full max-w-4xl">
-        <div className="text-center mb-4 sm:mb-8">
-          <label className="block text-base sm:text-lg font-medium text-gray-700">
-            {stage === "initial"
-              ? "img overlay tool"
-              : stage === "style"
-              ? "choose style"
-              : mode === "ghiblify"
-              ? "transforming image"
-              : "adjust overlay"}
-          </label>
-        </div>
+        <StudioStepper stage={stage} />
 
         {stage === "initial" && (
-          <InitialStage
-            isGenerating={isGenerating}
-            onFileUpload={handleBaseImageUpload}
-            onGenerateClick={() => setShowGenerateModal(true)}
-            LoadingText={LoadingText}
-          />
+          <div className="space-y-4">
+            <BrandKitPanel onLoad={applyBrandKitDefaults} compact />
+            <InitialStage
+              isGenerating={isGenerating}
+              onFileUpload={handleBaseImageUpload}
+              onGenerateClick={() => setShowGenerateModal(true)}
+              LoadingText={LoadingText}
+            />
+          </div>
         )}
 
         {baseImage && (
@@ -507,10 +762,12 @@ export default function ImageOverlay() {
             </div>
 
             <div className="w-full md:w-64 flex flex-col gap-4">
-              {stage === "style" ? (                  <StyleStage
+              {stage === "style" ? (
+                <StyleStage
                   mode={mode}
                   controls={controls}
                   updateControl={updateControl}
+                  onLogoUpload={handleLogoUpload}
                   loadPresetOverlay={loadPresetOverlay}
                   onStartOver={() => {
                     revokeAllObjectUrls();
@@ -521,16 +778,26 @@ export default function ImageOverlay() {
                   }}
                 />
               ) : (
-                <AdjustStage
-                  mode={mode}
-                  controls={controls}
-                  updateControl={updateControl}
-                  onDownload={handleDownload}
-                  onBack={handleBack}
-                  showControls={mode !== "ghiblify"}
-                  text={textControls}
-                  updateText={updateTextControl}
-                />
+                <>
+                  <BrandKitPanel
+                    onLoad={applyBrandKitDefaults}
+                    onSave={getBrandKitPayload}
+                    compact
+                  />
+                  <AdjustStage
+                    mode={mode}
+                    controls={controls}
+                    updateControl={updateControl}
+                    onDownload={() => void handleDownload()}
+                    onBack={handleBack}
+                    showControls={mode !== "ghiblify"}
+                    text={textControls}
+                    updateText={updateTextControl}
+                    exportFormats={exportFormats}
+                    onToggleExportFormat={toggleExportFormat}
+                    isExporting={isExporting}
+                  />
+                </>
               )}
             </div>
           </div>
@@ -542,7 +809,7 @@ export default function ImageOverlay() {
           isGenerating={isGenerating}
           generationPrompt={generationPrompt}
           setGenerationPrompt={setGenerationPrompt}
-          onGenerate={generateImage}
+          onGenerate={() => void generateImage()}
           onClose={cleanupGenerationState}
           LoadingText={LoadingText}
         />

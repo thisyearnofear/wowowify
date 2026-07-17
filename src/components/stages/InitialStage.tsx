@@ -1,4 +1,5 @@
 import React, { JSX } from "react";
+import { STUDIO_COPY } from "@/lib/studio-copy";
 
 interface InitialStageProps {
   isGenerating: boolean;
@@ -20,7 +21,7 @@ export const InitialStage = ({
           className="w-full sm:w-auto px-6 py-3 surface rounded-full cursor-pointer font-semibold text-sm text-center transition-all hover:shadow-md"
           style={{ color: "var(--color-wowowify)" }}
         >
-          📁 Choose File
+          {STUDIO_COPY.brief.uploadVisual}
           <input
             type="file"
             accept="image/*"
@@ -39,7 +40,7 @@ export const InitialStage = ({
           ) : (
             <>
               <span>✨</span>
-              Generate
+              {STUDIO_COPY.brief.writeBrief}
             </>
           )}
         </button>

@@ -1,6 +1,62 @@
-# WOWOWIFY Agent
+# @toka Agentic Brand Studio
 
-A Next.js application that provides AI-powered image generation using the Venice AI API, with built-in rate limiting and metrics tracking. It enables image overlays with predefined styles, logos, and filters as well as enabling the user to user their own images as overlays.
+@toka turns an exact logo and a creative brief into publication-ready social artwork. It combines generative imagery with deterministic logo and text composition, preserving brand marks instead of asking an image model to redraw them.
+
+## Product Vision
+
+Autonomous agents can write announcements and plan campaigns, but generative image models are unreliable at exact logos, typography, and brand placement. @toka provides the brand-safe production layer between a campaign brief and the finished creative:
+
+1. Generate a visual or start from an existing image.
+2. Apply the original logo without regenerating or distorting it.
+3. Control placement, scale, tint, opacity, and campaign copy.
+4. Return a persistent asset that an agent can publish or hand to a user.
+
+Community presets remain useful shortcuts, but bring-your-own-logo composition is the core direction.
+
+## Product Strategy
+
+@toka has one creative production system and two equal interfaces:
+
+- **Studio for people**: create, inspect, refine, and share campaign artwork in the browser.
+- **Service for agents**: call the same brand-safe composition contract through A2MCP now, with A2A and ACP-compatible commerce added as the service matures.
+
+An agent should be able to send a collaborator to a prefilled Studio brief for review and refinement. The browser experience is therefore a primary conversion surface, not a demo for the API.
+
+The product promise is simple: AI creates the visual world; @toka preserves the exact logo, campaign copy, and composition rules.
+
+## Ecosystem Commitments
+
+**Lisk** is @toka's founding ecosystem and first community launch partner. We will demonstrate brand kits and campaign workflows for Lisk creators, communities, and launches. Later, when customers need it, a Lisk provenance record can attest to a finished campaign specification and asset hash without putting source logos or private inputs onchain.
+
+**OKX and X Layer** are the current commerce and interaction focus. The Studio will offer an explicit, optional X Layer action for a useful campaign entitlement, payment, or delivery receipt. Wallet software must load only when a user requests that action; it is not a requirement for creating artwork.
+
+We do not mint every image or force users through a wallet flow. Onchain actions must represent a concrete entitlement, payment, or verifiable delivery event.
+
+## Delivery Roadmap
+
+1. Ship the human Studio and public brand-safe A2MCP service from the same composition contract.
+2. Add saved brand kits and multi-format campaign output.
+3. Let agents create drafts that open in Studio for human approval.
+4. Add paid agent usage through ACP/x402 and a focused, optional X Layer interaction.
+5. Add Lisk campaign provenance only where it delivers customer value.
+
+## Deployment Boundary
+
+The Studio and the public ASP share composition logic, but do not need the same runtime dependencies. The Studio keeps optional distribution integrations such as the Farcaster Mini App. The ASP deployment stays dependency-minimal and contains only the API route, composition services, storage, rate limiting, and observability required to produce brand-safe creative reliably. This keeps agent availability independent from optional client integrations.
+
+### Split deploy (production)
+
+| Variable | Studio | ASP |
+|---|---|---|
+| `TOKA_DEPLOYMENT` | `studio` or `all` (default) | `asp` |
+| `ASP_URL` | public ASP host (for agent.json) | this deployment's URL |
+| `STUDIO_URL` | this deployment's URL | public Studio host |
+
+Point `GET /.well-known/agent.json` → `endpoints.service` at the ASP host. Humans open drafts on `STUDIO_URL/?draftId=…`.
+
+Use `vercel.asp.json` (sets `TOKA_DEPLOYMENT=asp`) for a minimal ASP Vercel project. Studio keeps frames, Mini App, and admin history.
+
+**Farcaster SDK note:** `@farcaster/miniapp-sdk@0.3.0` is the current release. Socket currently flags a UUID dependency introduced by its optional Solana/Jayson transitive path. Do not downgrade the SDK, force a cross-major UUID override, or disable Socket; keep the Mini App in the Studio deployment and exclude it from the focused ASP runtime.
 
 ## Quick Start Guide for @toka Bot
 
@@ -16,16 +72,34 @@ This quick reference is especially useful for other bots or agents that want to 
 
 ## Agent Integration
 
-WOWOWIFY Agent can be controlled via natural language commands through its API, allowing external services to generate and manipulate images without interacting with the UI.
+External agents can generate brand-safe artwork without interacting with the UI. A custom `logoUrl` takes precedence over a preset `overlayMode`, ensuring the supplied mark is composited exactly as provided.
+
+`GET /api/agent` returns the service capability card for discovery. `POST /api/agent` creates the asset.
 
 ```bash
-# Example: Generate an image with a wowowify overlay
+# Generate campaign artwork and preserve the supplied logo
 curl -X POST https://your-app.com/api/agent \
   -H "Content-Type: application/json" \
   -d '{
-    "command": "Generate an image of a mountain landscape and add the wowowify overlay"
+    "command": "Generate a futuristic launch visual",
+    "parameters": {
+      "logoUrl": "https://example.com/brand-logo.png",
+      "text": {
+        "content": "THE FUTURE SHIPS TODAY",
+        "position": "bottom",
+        "style": "bold"
+      },
+      "controls": {
+        "scale": 0.5,
+        "x": 0,
+        "y": -40
+      },
+      "formats": ["square", "landscape", "portrait"]
+    }
   }'
 ```
+
+When `formats` is supplied, @toka generates the visual world once, then returns an `assets` array with deterministic crops and logo/text composition for each requested format.
 
 The agent understands commands like:
 
@@ -245,30 +319,15 @@ Here are some examples of text overlay commands:
 
 ## Features
 
-- 🎨 AI Image Generation using Venice AI
-- 🖼️ Image Overlay System with multiple modes:
-  - Lensify: Add lens-style overlays with Web3 storage via Grove
-- 🎭 Custom image upload for both base images and overlays
-- 🎛️ Advanced image controls:
-  - Positioning (X/Y coordinates)
-  - Scaling
-  - Color filters
-  - Opacity/transparency
-- 💬 Text Overlay System:
-  - Multiple font styles and families
-  - Positioning and alignment options
-  - Size, color, and style customization
-  - Background, stroke, and shadow effects
-- 💾 One-click download of combined images
-- 🔒 Rate limiting with Redis
-- 📊 Request metrics tracking
-- 🚦 Error handling and timeout management
-- 🔄 Automatic retries for Redis operations
-- 📝 Comprehensive logging
-- 🌳 Web3 storage integration with Grove (for Lensify overlay)
-- 🪙 NFT minting on multiple chains:
-  - Mantle Sepolia for mantleify images
-  - Base Sepolia for higherify and baseify images
+- AI image generation (Venice AI) from a campaign brief
+- Exact logo composition — brand marks are never redrawn by the model
+- Campaign copy overlay (position, size, color, style)
+- Community preset stamps (degenify, higherify, scrollify, etc.) as quick-start shortcuts
+- Multi-format campaign kits via `parameters.formats` (square, landscape, portrait)
+- Studio (browser), Command page, Farcaster bot, and `POST /api/agent` on one composition contract
+- Rate limiting, Redis-backed history, Vercel Blob persistence, structured logging
+- Optional Grove storage for Farcaster bot replies
+- AI style transforms (ghiblify via Replicate)
 
 ## Environment Setup
 
@@ -342,6 +401,7 @@ Process natural language commands to generate and manipulate images:
   "command": "your natural language command",
   "parameters": {
     "baseImageUrl": "optional URL to an existing image",
+    "logoUrl": "optional public HTTP(S) URL for an exact custom logo; overrides overlayMode",
     "prompt": "optional prompt to override NLP extraction",
     "overlayMode": "degenify" | "higherify" | "wowowify" /* no overlay stamp, AI image only */ | "scrollify" | "lensify" | "higherise" | "dickbuttify" | "nikefy" | "nounify" | "baseify" | "clankerify" | "mantleify" | "ghiblify",
     "controls": {
@@ -420,381 +480,23 @@ When deploying to Vercel or other serverless environments, keep these important 
    - Ensure timeouts are properly handled with AbortController
    - Verify that all environment variables are correctly set in Vercel
 
-## Grove Integration
 
-The application integrates with Grove, a secure, flexible, onchain-controlled storage layer for Web3 apps. When using the "lensify" overlay, the generated image is stored both in memory and on Grove.
+## Storage
 
-### How it works
-
-1. When a user requests an image with the "lensify" overlay, the application processes the image as usual.
-2. After processing, the image is stored in memory like other overlays.
-3. Additionally, the image is uploaded to Grove using the `@lens-chain/storage-client` library.
-4. The response includes both the standard image URLs and Grove-specific URIs and URLs.
-5. The UI displays Grove information when available, allowing users to access their images through Grove.
-
-### Benefits
-
-- **Persistent Storage**: Unlike in-memory storage, Grove provides more persistent storage for images.
-- **Web3 Integration**: Images stored on Grove can be referenced in Web3 applications.
-- **Access Control**: Grove supports various access control mechanisms for uploaded content.
-
-## Mantle NFT Integration
-
-The application includes NFT minting functionality on the Mantle Sepolia testnet, allowing users to mint their generated images as NFTs.
-
-### How It Works
-
-1. When a user generates an image with the "mantleify" overlay, they can mint it as an NFT directly from the UI.
-2. The minting process uses a smart contract deployed on the Mantle Sepolia testnet.
-3. The NFT metadata includes a reference to the Grove URL, ensuring the image is permanently stored.
-4. Users can view their minted NFTs in the gallery section of the admin page.
-
-### Smart Contract Details
-
-- **Contract Address**: `0x8b62d610c83c42ea8a8fc10f80581d9b7701cd37` (Mantle Sepolia Testnet)
-- **Contract Name**: MantleifyNFT
-- **Token Standard**: ERC-721
-- **Token Symbol**: MANTLE
-
-The contract includes the following key functions:
-
-```solidity
-// Mint a new NFT with the given Grove URL and metadata
-function mintNFT(
-    address to,
-    address creator,
-    string calldata groveUrl,
-    string calldata tokenURI
-) external returns (uint256)
-
-// Check if a Grove URL has already been minted
-function isGroveUrlMinted(string calldata groveUrl) public view returns (bool)
-
-// Get the token ID for a Grove URL
-function getTokenIdByGroveUrl(string calldata groveUrl) external view returns (uint256)
-```
-
-### Minting Process
-
-1. User generates an image with the "mantleify" overlay
-2. The image is stored on Grove for permanent storage
-3. User connects their wallet to the Mantle Sepolia network
-4. User clicks the "Mint as NFT" button
-5. The application prepares the transaction with:
-   - Recipient address (user's wallet)
-   - Creator address (user's wallet)
-   - Grove URL (for image reference)
-   - Token URI (metadata including the Grove URL)
-6. The transaction is sent to the Mantle Sepolia network
-7. Once confirmed, the NFT appears in the user's wallet and in the gallery
-
-### Viewing Minted NFTs
-
-Minted NFTs can be viewed in several ways:
-
-1. **Gallery View**: The admin page includes a gallery of all minted NFTs
-2. **Mantle Explorer**: Each NFT includes a link to view the transaction on Mantle Explorer
-3. **Wallet**: NFTs appear in the user's wallet if it supports ERC-721 tokens on Mantle Sepolia
-
-### Testing Mantle Integration
-
-To test the Mantle NFT integration:
-
-1. Connect your wallet to the Mantle Sepolia network
-2. Get some test MNT from the [Mantle Sepolia Faucet](https://faucet.sepolia.mantle.xyz/)
-3. Generate an image with the "mantleify" overlay
-4. Click the "Mint as NFT" button
-5. Confirm the transaction in your wallet
-6. View your NFT in the gallery or on Mantle Explorer
-
-## Base NFT Integration
-
-The application now includes an upgraded NFT system on Base Sepolia testnet that separates originals and editions into two contracts:
-
-### HigherBaseOriginals Contract
-
-This contract handles the minting of original NFTs for images created with our overlay system.
-
-- **Contract Address**: `0xF90552377071C01B8922c4879eA9E20A39476998` (Base Sepolia Testnet)
-- **Contract Name**: HigherBaseOriginals
-- **Token Standard**: ERC-721
-- **Token Symbol**: HBO
-- **Minting Price**: 0.05 ETH (testnet ETH)
-- **Supported Overlays**: Higher, Base, Dickbuttify
-
-The contract includes the following key functions:
-
-```solidity
-// Mint a new original NFT with the given Grove URL and metadata
-function mintOriginalNFT(
-    address to,
-    address creator,
-    string calldata groveUrl,
-    string calldata tokenURI,
-    OverlayType overlayType
-) external payable returns (uint256)
-
-// Check if a Grove URL has already been minted
-function isGroveUrlMinted(string calldata groveUrl) public view returns (bool)
-```
-
-### HigherBaseEditions Contract
-
-This companion contract allows users to mint editions of original NFTs. This functionality is not directly accessible from our main app but is available through a separate interface.
-
-- **Contract Address**: `0x6A0E6D188cFca3FdCcB7b68352B849b133eD74C9` (Base Sepolia Testnet)
-- **Contract Name**: HigherBaseEditions
-- **Token Standard**: ERC-1155
-- **Edition Price**: 0.01 ETH (testnet ETH)
-- **Maximum Editions**: 100 per original
-
-The contract includes the following key functions:
-
-```solidity
-// Mint an edition of an original NFT
-function mintEdition(uint256 originalId) external payable returns (uint256)
-
-// Get the URI for an edition
-function uri(uint256 editionId) public view returns (string memory)
-```
-
-### How It Works
-
-1. Users can mint original NFTs directly from our app after creating images with supported overlays
-2. Each original costs 0.05 testnet ETH to mint
-3. The original NFTs are stored on the HigherBaseOriginals contract
-4. Editions of these originals can be minted through a separate interface using the HigherBaseEditions contract
-5. Each edition costs 0.01 testnet ETH to mint
-6. Editions reference the original NFT's metadata with an edition number appended
+- **Production**: Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set
+- **Farcaster bot**: optional Grove uploads for persistent cast reply links (see [docs/archive/LEGACY_WEB3.md](./docs/archive/LEGACY_WEB3.md) for historical Web3/NFT integration notes)
 
 ## Farcaster Integration
 
-### Farcaster Bot
+The @toka bot processes natural-language commands when mentioned in a cast. See [TOKA_GUIDE.md](./docs/TOKA_GUIDE.md) for syntax, presets, and troubleshooting.
 
-The bot can process commands when mentioned in a Farcaster cast. It works in two ways:
+The **Mini App** at `/frames` lets Farcaster users write a campaign brief and generate artwork without leaving the client. Wallet connection is not required to create artwork.
 
-#### Generating New Images with Overlays
+### Bot setup (summary)
 
-- `@toka Generate a mountain landscape` - Generates a new image with the default overlay (Stable Diffusion)
-- `@toka degenify a futuristic city. scale to 0.5` - Generates an image with the degenify overlay
-- `@toka higherify a beach sunset. opacity to 0.7` - Generates an image with the higherify overlay
-- `@toka scrollify a minimalist tech background. color to blue` - Generates an image with the scrollify overlay
-- `@toka lensify a professional portrait. scale to 0.4` - Generates an image with the lensify overlay
-- `@toka higherise a cityscape. scale to 0.6` - Generates an image with the higherise overlay
-- `@toka dickbuttify a meme template. position at 10, 20` - Generates an image with the dickbuttify overlay
-- `@toka nikefy a sports scene. opacity to 0.8` - Generates an image with the nikefy overlay
-- `@toka nounify a cartoon character. scale to 0.5` - Generates an image with the nounify overlay
-- `@toka baseify a crypto-themed image. color to blue` - Generates an image with the baseify overlay
-- `@toka clankerify a robot scene. scale to 0.7` - Generates an image with the clankerify overlay
-- `@toka mantleify a blockchain visualization. scale to 0.5` - Generates an image with the mantleify overlay
-
-#### Applying Overlays to Existing Images
-
-When replying to a cast with an image:
-
-- `@toka degenify this image` - Applies the degenify overlay to the image in the parent cast
-- `@toka higherify this. scale to 0.3` - Applies the higherify overlay with scaling
-- `@toka scrollify. position at 10, 20` - Applies the scrollify overlay with positioning
-- `@toka lensify this photo. opacity to 0.5` - Applies the lensify overlay with opacity adjustment
-- `@toka overlay with degenify. color to red` - Applies the degenify overlay with color adjustment
-- `@toka higherise this` - Applies the higherise overlay to the parent image
-- `@toka dickbuttify this photo` - Applies the dickbuttify overlay to the parent image
-- `@toka nikefy. scale to 0.4` - Applies the nikefy overlay with scaling
-- `@toka nounify this. position at 20, 30` - Applies the nounify overlay with positioning
-- `@toka baseify this image. opacity to 0.6` - Applies the baseify overlay with opacity adjustment
-- `@toka clankerify. color to green` - Applies the clankerify overlay with color adjustment
-- `@toka mantleify this image. scale to 0.4` - Applies the mantleify overlay with scaling
-
-The bot is smart enough to understand that when you reply to a cast and use phrases like "this image", "this photo", or simply specify an overlay mode, you want to apply the overlay to the image in the parent cast.
-
-### Customization Options
-
-All overlays can be customized with the following parameters:
-
-- **Scale**: `scale to 0.5` - Adjusts the size of the overlay (0.1 to 2.0)
-- **Position**: `position at 10, 20` - Sets the X,Y coordinates of the overlay
-- **Color**: `color to red` - Changes the color filter of the overlay
-- **Opacity**: `opacity to 0.7` - Adjusts the transparency of the overlay (0.0 to 1.0)
-
-### Storage
-
-All images generated by the bot are stored on Grove for persistence, ensuring that they remain accessible even after the temporary URLs expire. The bot always replies with the Grove URL when available, providing a reliable link to the generated image.
-
-When an image is generated or processed:
-
-1. The image is first stored temporarily in memory
-2. It is then uploaded to Grove, a decentralized storage solution
-3. The Grove URL is included in the bot's reply
-4. This URL is permanent and can be accessed indefinitely
-
-This approach ensures that your images remain accessible long after the interaction with the bot, making it ideal for sharing and referencing images in the future.
-
-### Setup
-
-1. Create a Neynar account at [neynar.com](https://neynar.com) and get an API key
-2. Create a Farcaster bot and get a signer UUID
-3. Configure environment variables in your deployment:
-   ```
-   NEYNAR_API_KEY=your_neynar_api_key
-   FARCASTER_SIGNER_UUID=your_farcaster_signer_uuid
-   FARCASTER_BOT_FID=your_bot_fid
-   NEXT_PUBLIC_APP_URL=https://your-app-url.com
-   NEYNAR_WEBHOOK_SECRET=your_webhook_secret
-   ```
-4. Set up a webhook in the Neynar dashboard:
-   - Event: `cast.created`
-   - Filter: `mentioned_fids` = your bot's FID
-   - Target URL: `https://your-app-url.com/api/farcaster/webhook`
-
-### Access Control
-
-By default, the bot is configured to respond only to authorized users. This is managed through a Redis-based allowed users list, which can be updated via the admin API. This ensures that the bot's resources are used only by approved users during testing and early deployment phases.
-
-#### Managing the Allowlist
-
-The allowlist is a list of Farcaster FIDs (Farcaster IDs) that are authorized to use the bot. You can manage this list using the admin API:
-
-1. **View the current allowlist**:
-
-   ```bash
-   curl "https://your-app-url.com/api/farcaster/allowed-users?apiKey=YOUR_ADMIN_API_KEY"
-   ```
-
-2. **Add users to the allowlist**:
-
-   ```bash
-   curl -X POST "https://your-app-url.com/api/farcaster/allowed-users?apiKey=YOUR_ADMIN_API_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{"users": [5254, 8685, 323496, 7316, 898337]}'
-   ```
-
-   This will replace the existing allowlist with the new list of FIDs. Make sure to include all existing FIDs you want to keep, plus any new ones.
-
-3. **Find a user's FID**:
-   - You can find a user's FID by visiting their Warpcast profile and looking at the URL: `https://warpcast.com/username`
-   - Or by using the Neynar API: `curl -H "api_key: YOUR_NEYNAR_API_KEY" "https://api.neynar.com/v2/farcaster/user/search?q=username"`
-
-The `ADMIN_API_KEY` is set as an environment variable in your deployment. Make sure to keep this key secure and only share it with trusted administrators.
-
-### Testing
-
-You can test the webhook locally using the provided test script:
-
-```bash
-WEBHOOK_URL=http://localhost:3000/api/farcaster/webhook \
-FARCASTER_BOT_FID=123456 \
-COMMAND="lensify a mountain landscape" \
-node scripts/test-farcaster-webhook.js
-```
-
-To test the image overlay functionality specifically, you can use:
-
-```bash
-WEBHOOK_URL=http://localhost:3000/api/farcaster/webhook \
-FARCASTER_BOT_FID=123456 \
-COMMAND="degenify this image" \
-node scripts/test-farcaster-webhook.js
-```
-
-### Farcaster Frames
-
-The application now supports Farcaster Frames, allowing users to interact with the image overlay tool directly within Farcaster clients. This provides a seamless experience for users to:
-
-- wowowifys with overlays without leaving Farcaster
-- Connect their wallet for additional functionality
-- Access the full application with a single tap
-
-#### Using the Frame
-
-1. Visit the frame URL: `https://wowowify.vercel.app/frames`
-2. The frame will appear in Farcaster clients with a button to open the interactive interface
-3. Once opened, you can:
-   - Select an overlay mode
-   - Enter a prompt for image generation
-   - wowowifys directly within the frame
-   - Connect your wallet for additional functionality
-   - Open the full application if needed
-
-#### Frame Development
-
-The frame is built using:
-
-- `@farcaster/frame-sdk` - Official Farcaster Frame SDK
-- `@farcaster/frame-wagmi-connector` - Wallet connector for Farcaster Frames
-- `wagmi` and `viem` - For wallet interactions
-
-The frame implementation follows the Farcaster Frames v2 specification, providing a rich interactive experience within Farcaster clients.
-
-## Scroll NFT Integration
-
-The application includes NFT minting functionality on the Scroll Sepolia testnet, allowing users to mint images created with the "scrollify" overlay as NFTs.
-
-### How It Works
-
-1. When a user generates an image with the "scrollify" overlay, they can mint it as an NFT directly from the UI.
-2. The minting process uses a smart contract deployed on the Scroll Sepolia testnet.
-3. The NFT metadata includes a reference to the Grove URL, ensuring the image is permanently stored.
-4. Users can view their minted NFTs in the gallery section of the admin page.
-
-### Smart Contract Details
-
-- **Contract Address**: `0xf230170c3afd6bea32ab0d7747c04a831bf24968` (Scroll Sepolia Testnet)
-- **Contract Name**: Scrollify Originals
-- **Token Standard**: ERC-721
-- **Token Symbol**: SCROLL-O
-- **Minting Price**: 0.01 ETH (testnet ETH)
-
-The contract includes the following key functions:
-
-```solidity
-// Mint a new original NFT with the given token URI
-function mintOriginal(string calldata _tokenURI) external payable
-
-// Get the token URI for a token ID
-function tokenURI(uint256 tokenId) public view returns (string memory)
-
-// Get the creator of a token
-function creators(uint256 tokenId) public view returns (address)
-
-// Get the total supply of tokens
-function totalSupply() external view returns (uint256)
-
-// Get the mint price
-function MINT_PRICE() external view returns (uint256)
-```
-
-### Minting Process
-
-1. User generates an image with the "scrollify" overlay
-2. The image is stored on Grove for permanent storage
-3. User connects their wallet to the Scroll Sepolia network
-4. User clicks the "Mint Scrollify NFT" button
-5. The application prepares the transaction with:
-   - Recipient address (user's wallet)
-   - Creator address (user's wallet)
-   - Grove URL (for image reference)
-   - Token URI (metadata including the Grove URL)
-6. The transaction is sent to the Scroll Sepolia network
-7. Once confirmed, the NFT appears in the user's wallet and in the gallery
-
-### Viewing Minted NFTs
-
-Minted NFTs can be viewed in several ways:
-
-1. **Gallery View**: The admin page includes a gallery of all minted Scrollify NFTs
-2. **Scroll Explorer**: Each NFT includes a link to view the transaction on Scroll Explorer
-3. **Wallet**: NFTs appear in the user's wallet if it supports ERC-721 tokens on Scroll Sepolia
-
-### Testing Scroll Integration
-
-To test the Scroll NFT integration:
-
-1. Connect your wallet to the Scroll Sepolia network
-2. Get some test ETH from the [Scroll Sepolia Faucet](https://sepolia-faucet.scroll.io/)
-3. Generate an image with the "scrollify" overlay
-4. Click the "Mint Scrollify NFT" button
-5. Confirm the transaction in your wallet
-6. View your NFT in the gallery or on Scroll Explorer
+1. Neynar API key + bot signer UUID + webhook secret
+2. Webhook: `cast.created` → `https://your-app-url.com/api/farcaster/webhook`
+3. Allowlist via `/api/farcaster/allowed-users` during testing
 
 ## Ghibli Style Integration
 

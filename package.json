@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "vercel-install": "socket install --legacy-peer-deps",
+    "vercel-install": "npx --yes @socketsecurity/cli@1.1.102 npm install --legacy-peer-deps",
     "install:safe": "socket npm install",
     "socket": "socket",
     "secrets:scan": "secretlint \"**/*\" --secretlintrc .secretlintrc.json",
@@ -30,28 +30,21 @@
     ]
   },
   "dependencies": {
-    "@farcaster/frame-sdk": "^0.2.0",
-    "@farcaster/frame-wagmi-connector": "^2.0.0",
     "@farcaster/miniapp-sdk": "^0.3.0",
     "@google/generative-ai": "^0.23.0",
     "@lens-chain/storage-client": "^1.0.3",
     "@neynar/nodejs-sdk": "^2.19.0",
-    "@tanstack/react-query": "5.67.2",
     "@types/lodash": "^4.17.15",
     "@vercel/blob": "^2.3.3",
     "canvas": "^3.1.0",
-    "connectkit": "^1.9.2",
     "dotenv": "^16.4.7",
-    "ethers": "^6.13.5",
     "ioredis": "^5.6.0",
     "lodash": "^4.17.21",
     "next": "15.5.18",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "replicate": "^0.25.2",
-    "uuid": "^11.1.0",
-    "viem": "^2.55.2",
-    "wagmi": "^3.7.1"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -76,10 +69,6 @@
     "vitest": "^4.1.4"
   },
   "overrides": {
-    "connectkit": {
-      "react": "$react",
-      "react-dom": "$react-dom"
-    },
     "axios": "^1.15.0"
   },
   "engines": {

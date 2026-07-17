@@ -43,3 +43,13 @@ export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 /** Whether the current runtime is local development (true on localhost / non-prod) */
 export const IS_DEVELOPMENT = !IS_PRODUCTION;
+
+/** Deployment URLs and ASP/Studio split — canonical home is `@/lib/deployment`. */
+export {
+  ASP_URL,
+  STUDIO_URL,
+  getDeploymentMode,
+  isAspDeployment,
+  isStudioDeployment,
+} from "@/lib/deployment";
+export type { DeploymentMode } from "@/lib/deployment";

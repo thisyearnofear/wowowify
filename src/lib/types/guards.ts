@@ -26,8 +26,7 @@ export function isDefined<T>(
 /**
  * Non-throwing assertion: returns `v` if defined, returns `fallback` otherwise.
  *
- * Use when the absence is acceptable — e.g. optional wallet address passed
- * to "Connect wallet to mint" prompts.
+ * Use when the absence is acceptable — e.g. an optional overlay mode.
  *
  *   const title = defined(overlayMode, "your image");
  *

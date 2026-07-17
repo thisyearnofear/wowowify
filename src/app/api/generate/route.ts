@@ -181,7 +181,7 @@ export async function POST(request: Request) {
       });
       incrementFailedRequests().catch(() => {});
       return NextResponse.json(
-        { error: "Failed to wowowify. Please try again." },
+        { error: "Failed to generate image. Please try again." },
         { status: 500, headers: responseHeaders }
       );
     }

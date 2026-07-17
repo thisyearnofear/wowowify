@@ -1,156 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { MintResult } from "./MintHandlers";
+import { useState } from "react";
 import { FarcasterUser } from "@/types/farcaster";
-
-interface MintButtonsProps {
-  groveUrl: string | null;
-  isConnected: boolean;
-  isMinting: boolean;
-  isMantleify: boolean;
-  baseOverlayType: string | null;
-  isScrollify?: boolean;
-  isOnMantleSepolia: boolean;
-  isOnBaseSepolia: boolean;
-  isOnScrollSepolia: boolean;
-  handleMintMantleNFT: () => Promise<void>;
-  handleMintBaseNFT: (overlayType: string) => Promise<void>;
-  handleMintScrollifyNFT: () => Promise<void>;
-}
-
-/**
- * Component for displaying mint buttons
- */
-export const MintButtons = ({
-  groveUrl,
-  isConnected,
-  isMinting,
-  isMantleify,
-  baseOverlayType,
-  isScrollify,
-  isOnMantleSepolia,
-  isOnBaseSepolia,
-  isOnScrollSepolia,
-  handleMintMantleNFT,
-  handleMintBaseNFT,
-  handleMintScrollifyNFT,
-}: MintButtonsProps) => {
-  if (!groveUrl) return null;
-
-  return (
-    <div className="flex flex-col gap-2 w-full mt-4">
-      {/* Mantle minting button */}
-      {isMantleify && (
-        <button
-          className={`w-full py-2 px-4 rounded-md text-white ${
-            !isConnected || isMinting
-              ? "bg-gray-400 cursor-not-allowed"
-              : !isOnMantleSepolia
-              ? "bg-yellow-600 hover:bg-yellow-700"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-          onClick={handleMintMantleNFT}
-          disabled={!isConnected || isMinting}
-        >
-          {!isConnected
-            ? "Connect Wallet to Mint"
-            : !isOnMantleSepolia
-            ? "Switch to Mantle Sepolia"
-            : isMinting
-            ? "Minting..."
-            : "Mint"}
-        </button>
-      )}
-
-      {/* Base minting button */}
-      {baseOverlayType && (
-        <button
-          className={`w-full py-2 px-4 rounded-md text-white ${
-            !isConnected || isMinting
-              ? "bg-gray-400 cursor-not-allowed"
-              : !isOnBaseSepolia
-              ? "bg-yellow-600 hover:bg-yellow-700"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-          onClick={() => handleMintBaseNFT(baseOverlayType)}
-          disabled={!isConnected || isMinting}
-        >
-          {!isConnected
-            ? "Connect Wallet to Mint"
-            : !isOnBaseSepolia
-            ? "Switch to Base Sepolia"
-            : isMinting
-            ? "Minting..."
-            : "Mint"}
-        </button>
-      )}
-
-      {/* Scrollify minting button */}
-      {isScrollify && (
-        <button
-          className={`w-full py-2 px-4 rounded-md text-white ${
-            !isConnected || isMinting
-              ? "bg-gray-400 cursor-not-allowed"
-              : !isOnScrollSepolia
-              ? "bg-yellow-600 hover:bg-yellow-700"
-              : "bg-purple-600 hover:bg-purple-700"
-          }`}
-          onClick={handleMintScrollifyNFT}
-          disabled={!isConnected || isMinting}
-        >
-          {!isConnected
-            ? "Connect Wallet to Mint"
-            : !isOnScrollSepolia
-            ? "Switch to Scroll Sepolia"
-            : isMinting
-            ? "Minting..."
-            : "Mint"}
-        </button>
-      )}
-    </div>
-  );
-};
-
-interface MintResultDisplayProps {
-  mintResult: MintResult;
-}
-
-/**
- * Component for displaying mint result
- */
-export const MintResultDisplay = ({ mintResult }: MintResultDisplayProps) => {
-  if (!mintResult) return null;
-
-  return (
-    <div className="mt-4 p-3 rounded-md text-center">
-      {mintResult.success ? (
-        <div className="text-green-500">
-          <p className="font-semibold">{mintResult.message}</p>
-          {mintResult.explorerUrl && (
-            <a
-              href={mintResult.explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:underline text-sm mt-2 block"
-            >
-              View on Explorer
-            </a>
-          )}
-        </div>
-      ) : (
-        <div className="text-red-500">
-          <p>{mintResult.message}</p>
-          {mintResult.alreadyMinted && (
-            <p className="text-sm mt-1">
-              This image has already been minted as an NFT.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+import type { CampaignFormat } from "@/lib/agent-types";
+import type { BrandKit } from "@/lib/brand-kits";
+import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
+import { FormatSelector } from "@/components/studio/FormatSelector";
+import { buildZipFromDataUrls, triggerZipDownload } from "@/lib/export-zip";
+import { uploadLogoFile } from "@/lib/upload-logo-client";
 
 interface UserWelcomeProps {
   user: FarcasterUser | undefined;
@@ -171,11 +30,177 @@ export const UserWelcome = ({ user }: UserWelcomeProps) => {
   );
 };
 
+interface CampaignAssetResult {
+  format: CampaignFormat;
+  resultUrl?: string;
+  previewUrl?: string;
+}
+
+interface CampaignAssetsDisplayProps {
+  assets: CampaignAssetResult[];
+  handleOpenStudio: () => void;
+}
+
+export const CampaignAssetsDisplay = ({
+  assets,
+  handleOpenStudio,
+}: CampaignAssetsDisplayProps) => {
+  const [isZipping, setIsZipping] = useState(false);
+
+  const handleDownloadZip = async () => {
+    setIsZipping(true);
+    try {
+      const files = (
+        await Promise.all(
+          assets.map(async (asset) => {
+            const url = asset.resultUrl || asset.previewUrl;
+            if (!url) return null;
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            return { filename: `toka-${asset.format}.png`, dataUrl };
+          }),
+        )
+      ).filter((entry): entry is { filename: string; dataUrl: string } =>
+        Boolean(entry),
+      );
+
+      if (files.length === 0) return;
+      const zip = await buildZipFromDataUrls(files);
+      triggerZipDownload(zip, "toka-campaign.zip");
+    } finally {
+      setIsZipping(false);
+    }
+  };
+
+  return (
+  <div className="flex flex-col gap-3 w-full">
+    {assets.length > 1 && (
+      <button
+        type="button"
+        onClick={() => void handleDownloadZip()}
+        disabled={isZipping}
+        className="w-full py-2 px-4 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white rounded-md text-sm"
+      >
+        {isZipping ? "Preparing ZIP…" : "Download all (ZIP)"}
+      </button>
+    )}
+    {assets.map((asset) => {
+      const url = asset.resultUrl || asset.previewUrl;
+      if (!url) return null;
+      return (
+        <div key={asset.format} className="w-full">
+          <p className="text-xs text-gray-400 mb-1 capitalize">{asset.format}</p>
+          <div className="relative w-full aspect-square mb-2">
+            <Image
+              src={url}
+              alt={`${asset.format} artwork`}
+              fill
+              className="object-contain rounded-md"
+            />
+          </div>
+          <a
+            href={url}
+            download={`toka-${asset.format}.png`}
+            className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-center text-sm"
+          >
+            Export {asset.format}
+          </a>
+        </div>
+      );
+    })}
+    <button
+      className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-md"
+      onClick={handleOpenStudio}
+    >
+      Refine in Studio
+    </button>
+  </div>
+  );
+};
+
+interface BrandCampaignFieldsProps {
+  logoUrl: string;
+  setLogoUrl: (value: string) => void;
+  caption: string;
+  setCaption: (value: string) => void;
+  formats: CampaignFormat[];
+  onToggleFormat: (format: CampaignFormat) => void;
+  onLoadBrandKit: (kit: BrandKit) => void;
+}
+
+export const BrandCampaignFields = ({
+  logoUrl,
+  setLogoUrl,
+  caption,
+  setCaption,
+  formats,
+  onToggleFormat,
+  onLoadBrandKit,
+}: BrandCampaignFieldsProps) => {
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const handleLogoFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    void uploadLogoFile(file)
+      .then((url) => setLogoUrl(url))
+      .finally(() => setIsUploadingLogo(false));
+  };
+
+  return (
+  <div className="flex flex-col gap-3">
+    <BrandKitPanel onLoad={onLoadBrandKit} compact theme="dark" />
+    <div>
+      <label className="block text-xs text-gray-400 mb-1">Brand mark URL</label>
+      <input
+        type="url"
+        value={logoUrl}
+        onChange={(e) => setLogoUrl(e.target.value)}
+        placeholder="https://example.com/logo.png"
+        className="w-full p-2 border border-gray-700 bg-gray-800 text-white rounded-md text-sm"
+      />
+      <label className="mt-2 block w-full py-2 px-3 bg-gray-700 hover:bg-gray-600 rounded-md text-center text-xs cursor-pointer">
+        {isUploadingLogo ? "Uploading…" : "Upload logo file"}
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          onChange={handleLogoFile}
+          className="hidden"
+        />
+      </label>
+    </div>
+    <div>
+      <label className="block text-xs text-gray-400 mb-1">Campaign copy</label>
+      <input
+        type="text"
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        placeholder="Headline or caption…"
+        className="w-full p-2 border border-gray-700 bg-gray-800 text-white rounded-md text-sm"
+      />
+    </div>
+    <FormatSelector
+      selected={formats}
+      onToggle={onToggleFormat}
+      compact
+      theme="dark"
+    />
+  </div>
+  );
+};
+
 interface GeneratedImageDisplayProps {
   generatedImage: string;
   groveUrl: string | null;
   handleOpenGroveUrl: () => void;
-  handleOpenApp: () => void;
+  handleOpenStudio: () => void;
 }
 
 /**
@@ -185,7 +210,7 @@ export const GeneratedImageDisplay = ({
   generatedImage,
   groveUrl,
   handleOpenGroveUrl,
-  handleOpenApp,
+  handleOpenStudio,
 }: GeneratedImageDisplayProps) => {
   return (
     <div className="flex flex-col items-center w-full">
@@ -224,11 +249,19 @@ export const GeneratedImageDisplay = ({
           </button>
         )}
 
+        <a
+          href={generatedImage}
+          download="toka-artwork.png"
+          className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-center"
+        >
+          Export
+        </a>
+
         <button
           className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-md"
-          onClick={handleOpenApp}
+          onClick={handleOpenStudio}
         >
-          Open Full App
+          Refine in Studio
         </button>
       </div>
     </div>
@@ -257,7 +290,7 @@ export const PromptInput = ({
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         className="w-full p-2 border border-gray-700 bg-gray-800 text-white rounded-md"
-        placeholder="Try 'baseify a futuristic city' or 'overlay: higherify scale 0.5'"
+        placeholder="Describe your campaign brief…"
         rows={2}
         disabled={isGenerating}
       ></textarea>
@@ -271,7 +304,7 @@ export const PromptInput = ({
         onClick={handleGenerate}
         disabled={isGenerating}
       >
-        {isGenerating ? "Generating..." : "Generate"}
+        {isGenerating ? "Creating…" : STUDIO_COPY.brief.writeBrief}
       </button>
     </div>
   );

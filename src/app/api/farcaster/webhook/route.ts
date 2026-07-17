@@ -214,7 +214,7 @@ const replyToCast = async (
 const formatErrorMessage = (error: string): string => {
   // Check for specific error patterns
   if (error.includes("Wallet connection required for lensify overlay")) {
-    return "The 'lensify' overlay requires a wallet connection. Please visit https://wowowify.vercel.app/agent to use this feature directly.";
+    return "The 'lensify' overlay is not currently available through @toka. Try a brand-safe logo composition instead.";
   }
 
   // Add more error patterns as needed

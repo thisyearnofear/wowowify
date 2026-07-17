@@ -38,6 +38,8 @@ export interface ArchiveOptions {
   walletAddressForOverlay?: string;
   /** Farcaster paths get a one-shot Grove retry on transient failure. */
   isFarcaster?: boolean;
+  /** Campaign-kit variants already have durable Blob URLs; skip legacy archival. */
+  archiveToGrove?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ export async function archiveResult(
     baseUrl,
     walletAddressForOverlay,
     isFarcaster = false,
+    archiveToGrove: shouldArchiveToGrove = true,
   } = options;
 
   const requestId = uuidv4();
@@ -76,13 +79,15 @@ export async function archiveResult(
     : previewUrl;
 
   // 2. Best-effort Grove upload (never throws — returns {undefined} on failure).
-  const groveResult = await archiveToGrove(
-    resultBuffer,
-    resultId,
-    overlayMode,
-    walletAddressForOverlay,
-    isFarcaster,
-  );
+  const groveResult = shouldArchiveToGrove
+    ? await archiveToGrove(
+        resultBuffer,
+        resultId,
+        overlayMode,
+        walletAddressForOverlay,
+        isFarcaster,
+      )
+    : { groveUri: undefined, groveUrl: undefined };
 
   // 3. Three-id history fill so /api/image?id=<any of these> resolves to the URL
   //    after a cold start when the in-memory map has been replaced.

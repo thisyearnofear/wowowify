@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: "🏠" },
-  { href: "/agent", label: "Agent", icon: "🤖" },
-  { href: "/admin", label: "Gallery", icon: "🖼️" },
-  { href: "/frames", label: "Frame", icon: "⚡" },
+  { href: "/", label: "Studio", icon: "🎨" },
+  { href: "/agent", label: "Command", icon: "🤖" },
+  { href: "/admin", label: "History", icon: "🖼️" },
+  { href: "/frames", label: "Mini App", icon: "⚡" },
 ] as const;
 
 export default function Navigation() {
@@ -60,7 +60,7 @@ export default function Navigation() {
               style={{ color: "var(--color-wowowify)" }}
             >
               <span className="text-xl">🎨</span>
-              <span className="hidden sm:inline tracking-tight">WOWOWIFY</span>
+              <span className="hidden sm:inline tracking-tight">@toka</span>
             </Link>
           </div>
 

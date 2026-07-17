@@ -1,27 +1,19 @@
-export const LoadingText = () => {
-  const colors = [
-    "var(--color-degenify)",
-    "var(--color-higherify)",
-    "var(--color-scrollify)",
-    "var(--color-wowowify)",
-    "var(--color-degenify)",
-  ];
-
-  return (
-    <div className="flex items-center justify-center gap-0.5">
-      {Array.from("wowow").map((letter, i) => (
+export const LoadingText = () => (
+  <span
+    className="inline-flex items-center gap-1 text-sm font-medium"
+    style={{ color: "var(--color-wowowify)" }}
+  >
+    Creating
+    <span className="inline-flex">
+      {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="inline-block text-lg font-bold"
-          style={{
-            color: colors[i % colors.length],
-            animationDelay: `${i * 0.12}s`,
-            animation: "bounce 0.6s ease-in-out infinite",
-          }}
+          className="inline-block animate-bounce"
+          style={{ animationDelay: `${i * 0.15}s` }}
         >
-          {letter}
+          .
         </span>
       ))}
-    </div>
-  );
-};
+    </span>
+  </span>
+);

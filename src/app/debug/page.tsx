@@ -78,7 +78,7 @@ export default function DebugPage() {
       <div className="flex justify-center mb-6">
         <Image
           src="/wowwowowify.png"
-          alt="WOWOWIFY"
+          alt="@toka"
           width={200}
           height={200}
           className="w-32 h-auto"

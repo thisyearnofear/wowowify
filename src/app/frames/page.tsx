@@ -2,9 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-// Web3Provider + ToastContainer are now composed by ClientRoot in the root
-// layout, so this page no longer needs its own providers wrapper.
-// Dynamically import components that need to be client-side only
+// Dynamically import the Mini App UI because it depends on browser APIs.
 const FrameContent = dynamic(() => import("./FrameContent"), {
   ssr: false,
   loading: () => (

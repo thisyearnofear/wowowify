@@ -14,7 +14,12 @@
  * directly when it knows it needs, say, only text rendering.
  */
 
-import type { AgentResponse, ParsedCommand } from "@/lib/agent-types";
+import type {
+  AgentResponse,
+  CampaignFormat,
+  CampaignKitResponse,
+  ParsedCommand,
+} from "@/lib/agent-types";
 import { InterfaceType } from "@/lib/command-parser/index";
 import { CommandRouter } from "./command-router";
 
@@ -58,6 +63,14 @@ export class ImageService {
       walletAddressForOverlay,
       isFarcaster,
     );
+  }
+
+  public async processCampaignKit(
+    parsedCommand: ParsedCommand,
+    formats: CampaignFormat[],
+    baseUrl: string = "",
+  ): Promise<CampaignKitResponse> {
+    return this.router.processCampaignKit(parsedCommand, formats, baseUrl);
   }
 
   /**

@@ -20,7 +20,13 @@
 
 import { v4 as uuidv4 } from "uuid";
 
-import type { AgentResponse, ParsedCommand } from "@/lib/agent-types";
+import type {
+  AgentResponse,
+  CampaignAsset,
+  CampaignFormat,
+  CampaignKitResponse,
+  ParsedCommand,
+} from "@/lib/agent-types";
 import { logger } from "@/lib/logger";
 import { InterfaceType, parseCommand } from "@/lib/command-parser/index";
 import { ensureFontsAreRegistered } from "@/lib/image-processor";
@@ -156,6 +162,63 @@ export class CommandRouter {
         requestId,
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
+      });
+      return {
+        id: requestId,
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Generate the visual world once, then deterministically produce every
+   * requested campaign format from that source image.
+   */
+  public async processCampaignKit(
+    parsedCommand: ParsedCommand,
+    formats: CampaignFormat[],
+    baseUrl: string = "",
+  ): Promise<CampaignKitResponse> {
+    const requestId = uuidv4();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      if (parsedCommand.overlayMode === "ghiblify") {
+        throw new Error("Campaign kits do not support asynchronous transformations");
+      }
+
+      await ensureFontsAreRegistered();
+      CommandRouter.validateOverlayMode(parsedCommand.overlayMode);
+      const baseImageBuffer = await this.acquireBaseImage(parsedCommand, controller.signal);
+      const assets = await Promise.all(
+        formats.map(async (format): Promise<CampaignAsset> => {
+          const { resultBuffer, previewBuffer } = await composeImage(
+            parsedCommand,
+            baseImageBuffer,
+            baseUrl,
+            controller.signal,
+            format,
+          );
+          const result = await archiveResult({
+            resultBuffer,
+            previewBuffer,
+            overlayMode: parsedCommand.overlayMode,
+            baseUrl,
+            archiveToGrove: false,
+          });
+          return { ...result, format };
+        }),
+      );
+
+      return { id: requestId, status: "completed", assets };
+    } catch (error) {
+      logger.error("Error processing campaign kit", {
+        requestId,
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       return {
         id: requestId,

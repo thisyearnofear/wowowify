@@ -1,9 +1,14 @@
 import { OverlayMode } from "@/lib/config/overlays";
 
+export const CAMPAIGN_FORMATS = ["square", "landscape", "portrait"] as const;
+export type CampaignFormat = (typeof CAMPAIGN_FORMATS)[number];
+
 export interface AgentCommand {
   command: string;
   parameters?: {
     baseImageUrl?: string;
+    /** Public image URL for an exact brand mark composited without regeneration. */
+    logoUrl?: string;
     prompt?: string;
     overlayMode?: OverlayMode | "lensify";
     action?: "generate" | "overlay" | "adjust" | "download";
@@ -23,6 +28,9 @@ export interface AgentCommand {
       style?: string;
       backgroundColor?: string;
     };
+    formats?: CampaignFormat[];
+    /** Load saved defaults from a brand kit before applying explicit overrides. */
+    brandKitId?: string;
   };
   callbackUrl?: string;
   parentImageUrl?: string; // URL of the parent cast's image
@@ -44,6 +52,22 @@ export interface AgentResponse {
   pollUrl?: string;
   /** Human-readable status message accompanying `status === "processing"` */
   message?: string;
+  /** Persisted review draft for human approval in Studio */
+  draftId?: string;
+  studioReviewUrl?: string;
+}
+
+export interface CampaignAsset extends AgentResponse {
+  format: CampaignFormat;
+}
+
+export interface CampaignKitResponse {
+  id: string;
+  status: "completed" | "failed";
+  assets?: CampaignAsset[];
+  error?: string;
+  draftId?: string;
+  studioReviewUrl?: string;
 }
 
 export interface ParsedCommand {
@@ -51,6 +75,8 @@ export interface ParsedCommand {
   prompt?: string;
   overlayMode?: OverlayMode | "lensify";
   baseImageUrl?: string;
+  /** Public image URL for an exact brand mark; takes precedence over preset overlays. */
+  logoUrl?: string;
   useParentImage?: boolean; // Flag to use the parent cast's image
   controls?: {
     scale?: number;

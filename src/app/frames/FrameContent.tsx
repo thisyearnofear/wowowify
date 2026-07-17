@@ -1,626 +1,322 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import FrameSDK from "@farcaster/frame-sdk";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { APP_ORIGIN, APP_URL } from "@/lib/env";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CampaignFormat } from "@/lib/agent-types";
+import type { BrandKit } from "@/lib/brand-kits";
+import { buildStudioUrl } from "@/lib/studio-url";
+import { STUDIO_COPY } from "@/lib/studio-copy";
 import { FarcasterContext } from "@/types/farcaster";
 import {
-  isOnBaseSepolia,
-  isOnMantleSepolia,
-  isOnScrollSepolia,
-  handleSwitchToBaseSepolia,
-  handleSwitchToMantleSepolia,
-  handleSwitchToScrollSepolia,
-} from "@/components/frames/NetworkHandlers";
-import {
-  MintResult,
-  handleMintBaseNFT,
-  handleMintMantleNFT,
-  handleMintScrollifyNFT,
-} from "@/components/frames/MintHandlers";
-import {
-  MintButtons,
-  MintResultDisplay,
-  UserWelcome,
+  BrandCampaignFields,
+  CampaignAssetsDisplay,
   GeneratedImageDisplay,
-  PromptInput,
   ImageUpload,
+  PromptInput,
+  UserWelcome,
 } from "@/components/frames/FrameUI";
 import {
-  initializeMiniApp,
   getUserContext,
+  initializeMiniApp,
   isInMiniApp,
   trackEvent,
 } from "@/lib/miniapp";
 import { useToast } from "@/components/ui/Toast";
 import { logger } from "@/lib/logger";
 
-// Frame is hosted at APP_ORIGIN (warpcast/farcaster). postMessage must target
-// the runtime ancestor — not "*" (which Cross-Origin-Opener-Policy / modern
-// browsers reject). For local dev, also accept localhost.
-const ALLOWED_POSTMESSAGE_ANCESTORS = new Set<string>(
-  [APP_ORIGIN, "https://warpcast.com", "https://www.warpcast.com",
-   "https://farcaster.xyz", "https://www.farcaster.xyz",
-   "http://localhost:3000", "http://127.0.0.1:3000"].filter(Boolean),
-);
+interface CampaignAssetResult {
+  format: CampaignFormat;
+  resultUrl?: string;
+  previewUrl?: string;
+}
+
+interface AgentApiResponse {
+  error?: string;
+  groveUrl?: string;
+  resultUrl?: string;
+  assets?: CampaignAssetResult[];
+  status?: string;
+}
 
 export default function FrameContent() {
-  // wagmi's useConnect() owns the connector list and auto-picks — last used
-  // → injected → WalletConnect. No local config needed.
   const toast = useToast();
+  const objectUrlRef = useRef<string | null>(null);
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [contextData, setContextData] = useState<FarcasterContext | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [caption, setCaption] = useState("");
+  const [brandKitId, setBrandKitId] = useState("");
+  const [formats, setFormats] = useState<CampaignFormat[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedAssets, setGeneratedAssets] = useState<CampaignAssetResult[]>(
+    [],
+  );
   const [groveUrl, setGroveUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isMantleify, setIsMantleify] = useState(false);
-  const [baseOverlayType, setBaseOverlayType] = useState<string | null>(null);
-  const [isScrollify, setIsScrollify] = useState(false);
-  const [isGhiblify, setIsGhiblify] = useState(false);
-  const [isMinting, setIsMinting] = useState(false);
-  const [mintResult, setMintResult] = useState<MintResult | null>(null);
-  const [chainId, setChainId] = useState<number | null>(null);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
-
-  // Initialize the SDK
   useEffect(() => {
-    const init = async () => {
+    const initialize = async () => {
       try {
-        // Check if we're in a Mini App context
         const inMiniApp = isInMiniApp();
+        if (inMiniApp) await initializeMiniApp();
+        const context = inMiniApp ? await getUserContext() : null;
+        if (context) setContextData(context as unknown as FarcasterContext);
 
-        if (inMiniApp) {
-          // Initialize Mini App SDK
-          await initializeMiniApp();
-
-          // Get user context
-          const userContext = await getUserContext();
-          if (userContext) {
-            setContextData(userContext as unknown as FarcasterContext);
-          }
-        } else {
-          // Fallback to regular Frame SDK
-          const context = await FrameSDK.context;
-          setContextData(context as unknown as FarcasterContext);
-        }
-
-        // Hide splash screen after UI renders
-        setTimeout(() => {
-          // Use ready() instead of hideSplashScreen()
-          FrameSDK.actions.ready();
-          setIsSDKLoaded(true);
-        }, 500);
-
-        // Track Mini App initialization
+        setIsSDKLoaded(true);
         trackEvent("miniapp_initialized", {
+          hasContext: Boolean(context),
           isMiniApp: inMiniApp,
-          hasContext: Boolean(contextData),
         });
-      } catch (error) {
-        console.error("Error initializing Frame/Mini App SDK:", error);
-        setIsSDKLoaded(true); // Still set to true so UI renders
+      } catch (initializationError) {
+        logger.error("FrameContent: Mini App initialization failed", {
+          error:
+            initializationError instanceof Error
+              ? initializationError.message
+              : String(initializationError),
+        });
+        setIsSDKLoaded(true);
       }
     };
 
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void initialize();
   }, []);
 
-  // Check network on mount and when connection changes
   useEffect(() => {
-    const checkNetwork = async () => {
-      if (isConnected && window.ethereum) {
-        try {
-          const chainIdHex = await window.ethereum.request({
-            method: "eth_chainId",
-          });
-          const currentChainId = parseInt(chainIdHex, 16);
-          setChainId(currentChainId);
-        } catch (err) {
-          console.error("Error checking chain ID:", err);
-        }
-      }
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
+  }, []);
 
-    checkNetwork();
+  const studioUrl = buildStudioUrl({
+    brief: prompt,
+    logoUrl: logoUrl || undefined,
+    caption: caption || undefined,
+    brandKitId: brandKitId || undefined,
+    autostart: true,
+  });
 
-    // Listen for chain changes
-    if (window.ethereum) {
-      const handleChainChanged = (chainIdHex: string) => {
-        setChainId(parseInt(chainIdHex, 16));
-      };
+  const applyBrandKit = useCallback(
+    (kit: BrandKit) => {
+      setBrandKitId(kit.id);
+      if (kit.logoUrl) setLogoUrl(kit.logoUrl);
+      if (kit.text?.content) setCaption(kit.text.content);
+      if (kit.formats?.length) setFormats(kit.formats);
+    },
+    [],
+  );
 
-      window.ethereum.on("chainChanged", handleChainChanged);
+  const toggleFormat = (format: CampaignFormat) => {
+    setFormats((current) =>
+      current.includes(format)
+        ? current.filter((entry) => entry !== format)
+        : [...current, format],
+    );
+  };
 
-      return () => {
-        window.ethereum.removeListener("chainChanged", handleChainChanged);
+  const buildParameters = useCallback(() => {
+    const parameters: Record<string, unknown> = {};
+    if (brandKitId) parameters.brandKitId = brandKitId;
+    if (logoUrl.trim()) parameters.logoUrl = logoUrl.trim();
+    if (caption.trim()) {
+      parameters.text = {
+        content: caption.trim(),
+        position: "bottom",
+        fontSize: 48,
+        color: "white",
+        style: "bold",
       };
     }
-  }, [isConnected]);
-
-  const handleConnectWallet = useCallback(() => {
-    // wagmi v2 requires an explicit connector — useConnect().connect does NOT
-    // auto-pick. connectors[0] is the first injected/wallet connector registered
-    // by the root WagmiProvider chain list (see lib/web3/config.ts). Fall back
-    // to a toast if nothing is configured, so the user is told instead of
-    // silently no-op'ing.
-    const connector = connectors[0];
-    if (!connector) {
-      toast.showError("No wallet connector available — please install MetaMask or another wallet");
-      return;
-    }
-    connect({ connector });
-  }, [connect, connectors, toast]);
-
-  const handleDisconnectWallet = useCallback(() => {
-    disconnect();
-  }, [disconnect]);
+    if (formats.length > 0) parameters.formats = formats;
+    return Object.keys(parameters).length > 0 ? parameters : undefined;
+  }, [brandKitId, logoUrl, caption, formats]);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
-      setError("Please enter a prompt");
+      setError("Please enter a campaign brief");
       return;
     }
 
     setError(null);
     setIsGenerating(true);
     setGeneratedImage(null);
+    setGeneratedAssets([]);
     setGroveUrl(null);
-    setMintResult(null);
-    setIsMantleify(false);
-    setBaseOverlayType(null);
-    setIsScrollify(false);
-    setIsGhiblify(false);
 
     try {
-      // Check if this is a ghiblify request
-      const isGhiblifyRequest = prompt.toLowerCase().includes("ghiblify");
+      const response = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: prompt,
+          parameters: buildParameters(),
+          isFarcaster: true,
+        }),
+      });
+      const data = (await response.json()) as AgentApiResponse;
 
-      if (isGhiblifyRequest) {
-        // Extract the image URL from the prompt or context
-        const imageUrl =
-          contextData?.inputImageUrl || prompt.match(/https?:\/\/[^\s]+/)?.[0];
+      if (!response.ok || data.error) {
+        throw new Error(data.error || `Generation failed (${response.status})`);
+      }
 
-        if (!imageUrl) {
-          throw new Error("No image URL found to transform");
-        }
-
-        // Call the replicate endpoint
-        const response = await fetch("/api/replicate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            imageUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        setGeneratedImage(data.url);
-        setIsGhiblify(true);
-
-        // Post message to parent frame
-        postMessageToParent("imageGenerated", {
-          imageUrl: data.url,
-          isGhiblify: true,
-        });
-      } else {
-        // Handle regular image generation
-        const response = await fetch("/api/agent", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            command: prompt,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        {
-          // Privacy: log response shape only — no URLs or wallet-touching values.
-          const responseData = data as Record<string, unknown> | null;
-          logger.info("FrameContent: generation response received", {
-            keys:
-              responseData && typeof responseData === "object"
-                ? Object.keys(responseData).join(",")
-                : "none",
-            hasResult: Boolean(responseData?.resultUrl),
-            hasError: Boolean(responseData?.error),
-            overlayMode:
-              typeof responseData?.overlayMode === "string"
-                ? responseData.overlayMode
-                : null,
-          });
-        }
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
+      if (data.assets?.length) {
+        setGeneratedAssets(data.assets);
+      } else if (data.resultUrl) {
         setGeneratedImage(data.resultUrl);
         setGroveUrl(data.groveUrl || null);
-
-        // Check if this is a mantleify image
-        if (
-          prompt.toLowerCase().includes("mantleify") ||
-          (data.overlayMode && data.overlayMode.toLowerCase() === "mantleify")
-        ) {
-          setIsMantleify(true);
-        }
-
-        // Check if this is a scrollify image
-        if (
-          prompt.toLowerCase().includes("scrollify") ||
-          (data.overlayMode && data.overlayMode.toLowerCase() === "scrollify")
-        ) {
-          setIsScrollify(true);
-        }
-
-        // Check if this is a Base NFT-compatible overlay
-        const baseOverlays = [
-          "higherify",
-          "baseify",
-          "higherise",
-          "dickbuttify",
-        ];
-        for (const overlay of baseOverlays) {
-          if (
-            prompt.toLowerCase().includes(overlay) ||
-            (data.overlayMode && data.overlayMode.toLowerCase() === overlay)
-          ) {
-            setBaseOverlayType(overlay);
-            break;
-          }
-        }
-
-        // Post message to parent frame
-        postMessageToParent("imageGenerated", {
-          imageUrl: data.resultUrl,
-          groveUrl: data.groveUrl,
-        });
+      } else {
+        throw new Error("No artwork returned");
       }
-    } catch (err) {
-      console.error("Error generating image:", err);
-      setError(err instanceof Error ? err.message : "Failed to generate image");
+
+      trackEvent("generation_completed", {
+        source: "farcaster",
+        formatCount: formats.length,
+        hasBrandKit: Boolean(brandKitId),
+      });
+    } catch (generationError) {
+      const message =
+        generationError instanceof Error
+          ? generationError.message
+          : "Failed to generate artwork";
+      setError(message);
+      toast.showError(message);
     } finally {
       setIsGenerating(false);
     }
-  }, [prompt, contextData]);
-
-  const handleOpenGroveUrl = useCallback(() => {
-    if (groveUrl) {
-      window.open(groveUrl, "_blank");
-    }
-  }, [groveUrl]);
-
-  const handleOpenApp = useCallback(() => {
-    window.open(APP_URL, "_blank");
-  }, []);
-
-  const handleReset = () => {
-    setPrompt("");
-    setGeneratedImage(null);
-    setGroveUrl(null);
-    setError(null);
-    setMintResult(null);
-    setIsMantleify(false);
-    setBaseOverlayType(null);
-  };
-
-  const handleSwitchToBase = async () => {
-    // Create a no-op function to satisfy the API
-    const noOp = () => {};
-    await handleSwitchToBaseSepolia(setError, noOp);
-  };
-
-  const handleSwitchToMantle = async () => {
-    // Create a no-op function to satisfy the API
-    const noOp = () => {};
-    await handleSwitchToMantleSepolia(setError, noOp);
-  };
-
-  const handleSwitchToScroll = async () => {
-    // Create a no-op function to satisfy the API
-    const noOp = () => {};
-    await handleSwitchToScrollSepolia(setError, noOp);
-  };
-
-  const mintBaseNFT = async (overlayType: string) => {
-    // Check if on the correct network
-    if (!isOnBaseSepolia(chainId)) {
-      setError("Please switch to Base Sepolia network");
-      await handleSwitchToBase();
-      return;
-    }
-
-    await handleMintBaseNFT(
-      overlayType,
-      address,
-      groveUrl,
-      setIsMinting,
-      setMintResult,
-    );
-  };
-
-  const mintMantleNFT = async () => {
-    // Check if on the correct network
-    if (!isOnMantleSepolia(chainId)) {
-      setError("Please switch to Mantle Sepolia network");
-      await handleSwitchToMantle();
-      return;
-    }
-
-    await handleMintMantleNFT(address, groveUrl, setIsMinting, setMintResult);
-  };
-
-  const mintScrollifyNFT = async () => {
-    // Check if on the correct network
-    if (!isOnScrollSepolia(chainId)) {
-      setError("Please switch to Scroll Sepolia network");
-      await handleSwitchToScroll();
-      return;
-    }
-
-    await handleMintScrollifyNFT(
-      address,
-      groveUrl,
-      setIsMinting,
-      setMintResult,
-    );
-  };
-
-  const postMessageToParent = (
-    action: string,
-    data: Record<string, unknown>,
-  ) => {
-    if (!window.parent || window.parent === window) return;
-    // Determine the trusted ancestor target. When running inside a Farcaster
-    // client the parent's origin is in our allow list. Outside that context
-    // we still allow the canonical APP_ORIGIN for local dev and tests.
-    const candidates = ALLOWED_POSTMESSAGE_ANCESTORS;
-    try {
-      const targetOrigin = candidates.values().next().value ?? "*";
-      window.parent.postMessage({ action, data }, targetOrigin);
-    } catch {
-      // Fallback to "*" only if the candidate set enumeration fails.
-      window.parent.postMessage({ action, data }, "*");
-    }
-  };
+  }, [prompt, buildParameters, formats.length, brandKitId, toast]);
 
   const handleImageSelect = useCallback((file: File) => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const objectUrl = URL.createObjectURL(file);
+    objectUrlRef.current = objectUrl;
     setUploadedImage(file);
-    const url = URL.createObjectURL(file);
-    setUploadedImageUrl(url);
-    return () => URL.revokeObjectURL(url);
+    setUploadedImageUrl(objectUrl);
   }, []);
 
-  const handleGhiblify = useCallback(async () => {
+  const handleTransform = useCallback(async () => {
     if (!uploadedImage) {
-      toast.showError("Please choose an image first");
+      toast.showError("Choose an image first");
       return;
     }
 
-    setIsGenerating(true);
     setError(null);
+    setIsGenerating(true);
     setGeneratedImage(null);
+    setGeneratedAssets([]);
     setGroveUrl(null);
-    setMintResult(null);
-
-    trackEvent("generation_started", {
-      hasPrompt: !!prompt.trim(),
-      hasUploadedImage: !!uploadedImage,
-      generationType: "wowowify",
-    });
-    setIsGhiblify(true);
 
     try {
       const formData = new FormData();
       formData.append("image", uploadedImage);
-
       const response = await fetch("/api/replicate", {
         method: "POST",
         body: formData,
       });
+      const data = (await response.json()) as { error?: string; url?: string };
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
+      if (!response.ok || data.error || !data.url) {
+        throw new Error(data.error || `Transformation failed (${response.status})`);
       }
 
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      if (data.url) {
-        setGeneratedImage(data.url);
-        postMessageToParent("imageGenerated", {
-          imageUrl: data.url,
-          isGhiblify: true,
-        });
-      } else {
-        throw new Error("No transformed image URL received");
-      }
-    } catch (error) {
-      console.error("Error transforming image:", error);
-      const msg = error instanceof Error ? error.message : "Failed to transform image";
-      setError(msg);
-      toast.showError(msg);
-      setIsGhiblify(false);
+      setGeneratedImage(data.url);
+    } catch (transformationError) {
+      const message =
+        transformationError instanceof Error
+          ? transformationError.message
+          : "Failed to transform image";
+      setError(message);
+      toast.showError(message);
     } finally {
       setIsGenerating(false);
     }
-  }, [uploadedImage, toast, prompt]);
+  }, [toast, uploadedImage]);
 
   const handleClear = useCallback(() => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = null;
     setUploadedImage(null);
     setUploadedImageUrl(null);
-    setError(null);
   }, []);
 
-  if (!isSDKLoaded) {
-    return <div className="p-4 text-center">Loading frame...</div>;
-  }
+  const handleReset = useCallback(() => {
+    setPrompt("");
+    setGeneratedImage(null);
+    setGeneratedAssets([]);
+    setGroveUrl(null);
+    setError(null);
+    handleClear();
+  }, [handleClear]);
+
+  const openStudio = useCallback(() => {
+    window.open(studioUrl, "_blank");
+  }, [studioUrl]);
+
+  if (!isSDKLoaded) return <div className="p-4 text-center">Loading @toka...</div>;
+
+  const hasResult = Boolean(generatedImage || generatedAssets.length);
 
   return (
     <div className="w-[320px] mx-auto py-4 px-2 bg-gray-900 text-white rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold text-center mb-4">WOWOWIFY</h1>
-
+      <h1 className="text-2xl font-bold text-center mb-1">@toka</h1>
+      <p className="text-xs text-center text-gray-400 mb-4">{STUDIO_COPY.tagline}</p>
       {contextData?.user && <UserWelcome user={contextData.user} />}
 
-      {!generatedImage ? (
+      {!hasResult ? (
         <>
           <div className="flex flex-col gap-4">
-            <ImageUpload
-              onImageSelect={handleImageSelect}
-              onGhiblify={handleGhiblify}
-              onClear={handleClear}
-              selectedImage={uploadedImageUrl}
-              isTransforming={isGenerating && isGhiblify}
+            <BrandCampaignFields
+              logoUrl={logoUrl}
+              setLogoUrl={setLogoUrl}
+              caption={caption}
+              setCaption={setCaption}
+              formats={formats}
+              onToggleFormat={toggleFormat}
+              onLoadBrandKit={applyBrandKit}
             />
-
-            <div className="text-center text-sm text-gray-400">- or -</div>
-
             <PromptInput
               prompt={prompt}
               setPrompt={setPrompt}
               isGenerating={isGenerating}
               handleGenerate={handleGenerate}
             />
+            <div className="text-center text-sm text-gray-400">- or -</div>
+            <ImageUpload
+              onImageSelect={handleImageSelect}
+              onGhiblify={handleTransform}
+              onClear={handleClear}
+              selectedImage={uploadedImageUrl}
+              isTransforming={isGenerating}
+            />
           </div>
-
-          {error && (
-            <div className="mt-4 p-2 bg-red-900 text-white rounded-md text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-4 flex flex-col gap-2 w-full">
-            {isConnected ? (
-              <button
-                className="w-full py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-md"
-                onClick={handleDisconnectWallet}
-              >
-                Disconnect Wallet
-              </button>
-            ) : (
-              <button
-                className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                onClick={handleConnectWallet}
-              >
-                Connect Wallet
-              </button>
-            )}
-
-            <button
-              className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-md"
-              onClick={handleOpenApp}
-            >
-              Open Full App
-            </button>
-          </div>
+          {error && <div className="mt-4 p-2 bg-red-900 rounded-md text-sm">{error}</div>}
         </>
       ) : (
         <div className="flex flex-col items-center w-full">
-          <GeneratedImageDisplay
-            generatedImage={generatedImage}
-            groveUrl={groveUrl}
-            handleOpenGroveUrl={handleOpenGroveUrl}
-            handleOpenApp={handleOpenApp}
-          />
-
-          <MintButtons
-            groveUrl={groveUrl}
-            isConnected={isConnected}
-            isMinting={isMinting}
-            isMantleify={isMantleify}
-            baseOverlayType={baseOverlayType}
-            isScrollify={isScrollify}
-            isOnMantleSepolia={isOnMantleSepolia(chainId)}
-            isOnBaseSepolia={isOnBaseSepolia(chainId)}
-            isOnScrollSepolia={isOnScrollSepolia(chainId)}
-            handleMintMantleNFT={mintMantleNFT}
-            handleMintBaseNFT={mintBaseNFT}
-            handleMintScrollifyNFT={mintScrollifyNFT}
-          />
-
-          {mintResult && <MintResultDisplay mintResult={mintResult} />}
-
-          {error && (
-            <div className="mt-4 p-2 bg-red-900 text-white rounded-md text-sm">
-              {error}
-            </div>
+          {generatedAssets.length > 0 ? (
+            <CampaignAssetsDisplay
+              assets={generatedAssets}
+              handleOpenStudio={openStudio}
+            />
+          ) : (
+            generatedImage && (
+              <GeneratedImageDisplay
+                generatedImage={generatedImage}
+                groveUrl={groveUrl}
+                handleOpenGroveUrl={() => groveUrl && window.open(groveUrl, "_blank")}
+                handleOpenStudio={openStudio}
+              />
+            )
           )}
-
-          <div className="mt-4 flex flex-col gap-2 w-full">
-            <button
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-              onClick={handleReset}
-            >
-              Generate Another
-            </button>
-
-            {isConnected ? (
-              <button
-                className="w-full py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-md"
-                onClick={handleDisconnectWallet}
-              >
-                Disconnect Wallet
-              </button>
-            ) : (
-              <button
-                className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                onClick={handleConnectWallet}
-              >
-                Connect Wallet
-              </button>
-            )}
-          </div>
+          <button
+            className="mt-4 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+            onClick={handleReset}
+          >
+            Create another
+          </button>
         </div>
       )}
-
-      {!isConnected && isMantleify && generatedImage && (
-        <div className="w-full p-2 bg-gray-800 rounded-md text-xs text-center text-gray-300">
-          Connect your wallet to mint this as an NFT on Mantle
-        </div>
-      )}
-
-      {!isConnected && baseOverlayType && generatedImage && (
-        <div className="w-full p-2 bg-gray-800 rounded-md text-xs text-center text-gray-300 mt-2">
-          Connect your wallet to mint this as an NFT on Base
-        </div>
-      )}
-
-      {isConnected && (
-        <div className="mt-4 text-center text-xs text-gray-400">
-          Connected: {address?.slice(0, 6)}...{address?.slice(-4)}
-        </div>
-      )}
-
-
     </div>
   );
 }

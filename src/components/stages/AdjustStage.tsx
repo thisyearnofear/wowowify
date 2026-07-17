@@ -1,5 +1,8 @@
 import React from "react";
 import { OverlayMode, OVERLAY_COLORS } from "@/lib/config/overlays";
+import type { CampaignFormat } from "@/lib/agent-types";
+import { FormatSelector } from "@/components/studio/FormatSelector";
+import { STUDIO_COPY } from "@/lib/studio-copy";
 
 interface TextControls {
   content: string;
@@ -23,6 +26,9 @@ interface AdjustStageProps {
   /** Text overlay controls — when provided, shows text editing section */
   text?: TextControls;
   updateText?: (key: keyof TextControls, value: string | number) => void;
+  exportFormats?: CampaignFormat[];
+  onToggleExportFormat?: (format: CampaignFormat) => void;
+  isExporting?: boolean;
 }
 
 const TEXT_POSITIONS = [
@@ -48,6 +54,9 @@ export const AdjustStage = ({
   showControls = true,
   text,
   updateText,
+  exportFormats = [],
+  onToggleExportFormat,
+  isExporting = false,
 }: AdjustStageProps) => {
   return (
     <div className="animate-fadeIn">
@@ -103,7 +112,7 @@ export const AdjustStage = ({
                   OVERLAY_COLORS[mode]?.text || "text-gray-700"
                 }`}
               >
-                ✏️ Text Overlay
+                Campaign copy
               </h3>
 
               {/* Text content input */}
@@ -112,7 +121,7 @@ export const AdjustStage = ({
                   type="text"
                   value={text.content}
                   onChange={(e) => updateText("content", e.target.value)}
-                  placeholder="Enter text to overlay..."
+                  placeholder="Headline or caption..."
                   className="w-full px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-current focus:border-transparent"
                   maxLength={100}
                 />
@@ -196,9 +205,20 @@ export const AdjustStage = ({
         </div>
       )}
 
+      {onToggleExportFormat && (
+        <div className="mb-4">
+          <FormatSelector
+            selected={exportFormats}
+            onToggle={onToggleExportFormat}
+            compact
+          />
+        </div>
+      )}
+
       <div className="flex gap-3 justify-center">
         <button
           onClick={onDownload}
+          disabled={isExporting}
           className={`flex-1 p-2 md:px-6 md:py-3 rounded-lg transition-all flex items-center justify-center gap-2 ${
             OVERLAY_COLORS[mode]?.active?.split(" ")[0] ||
             (mode === "ghiblify"
@@ -206,7 +226,13 @@ export const AdjustStage = ({
               : "bg-gray-600")
           } hover:opacity-90 text-white`}
         >
-          <span className="hidden md:inline">Download</span>
+          <span className="hidden md:inline">
+            {isExporting
+              ? STUDIO_COPY.export.saving
+              : exportFormats.length > 1
+                ? `${STUDIO_COPY.export.action} (${exportFormats.length})`
+                : STUDIO_COPY.export.action}
+          </span>
           <span>⬇️</span>
         </button>
         <button

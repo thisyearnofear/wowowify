@@ -67,7 +67,7 @@ export async function generateImage(
       statusText: response.statusText,
       responseText: text,
     });
-    throw new Error(`Failed to wowowify: ${response.statusText}`);
+    throw new Error(`Failed to generate image: ${response.statusText}`);
   }
 
   const data = (await response.json()) as { images?: string[] };

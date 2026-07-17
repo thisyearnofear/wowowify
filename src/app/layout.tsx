@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { createMiniAppMetaTags } from "@/lib/miniapp";
+import { createMiniAppMetaTags, MINIAPP_CONFIG } from "@/lib/miniapp";
 import { APP_URL, APP_ICON_URL } from "@/lib/env";
 import ClientRoot from "@/components/providers/ClientRoot";
 
@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   ...createMiniAppMetaTags(
-    "WOWOWIFY",
-    "Create amazing visual overlays and effects directly in Farcaster. Transform your images with cool wowowify effects in seconds.",
+    `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+    MINIAPP_CONFIG.description,
     `${APP_URL}/previews/frame-preview.png`,
     "🎨 Generate Image",
   ),
@@ -54,8 +54,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* ClientRoot: composes Web3Provider + ToastContainer (client-only).
-            Bypasses SSR because wagmi/connectkit/Farcaster-SDK all touch window. */}
+        {/* ClientRoot mounts shared client-only UI such as toast notifications. */}
         <ClientRoot>{children}</ClientRoot>
       </body>
     </html>

@@ -2,23 +2,20 @@
  * Mini App utilities and configuration for Farcaster Mini Apps
  */
 
-import FrameSDK from "@farcaster/frame-sdk";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { APP_URL, APP_ICON_URL } from "./env";
 import { logger } from "./logger";
 
-// Type assertion to help TypeScript
-const frameSDK = FrameSDK as typeof FrameSDK;
-
 // Mini App configuration constants
 export const MINIAPP_CONFIG = {
-  name: "WOWOWIFY",
+  name: "@toka",
   description:
-    "Create amazing visual overlays and effects directly in Farcaster",
+    "Turn your logo and creative brief into brand-safe social artwork",
   version: "1",
   categories: ["creative", "tools", "media"],
-  tags: ["image", "overlay", "effects", "visual", "creative", "art"],
+  tags: ["brand", "logo", "image", "creative", "social", "art"],
   primaryCategory: "creative",
-  permissions: ["identity", "wallet"] as const,
+  permissions: ["identity"] as const,
 } as const;
 
 /**
@@ -26,16 +23,7 @@ export const MINIAPP_CONFIG = {
  */
 export function isInMiniApp(): boolean {
   try {
-    // Check for Mini App SDK availability
-    if (typeof window !== "undefined" && window.parent !== window) {
-      // Check for Farcaster-specific context
-      return Boolean(
-        (window as unknown as { farcaster?: unknown }).farcaster ||
-          (window as unknown as { miniapp?: unknown }).miniapp ||
-          frameSDK?.context,
-      );
-    }
-    return false;
+    return typeof window !== "undefined" && window.parent !== window;
   } catch (error) {
     console.warn("Error checking Mini App context:", error);
     return false;
@@ -48,8 +36,7 @@ export function isInMiniApp(): boolean {
 export async function initializeMiniApp() {
   try {
     if (isInMiniApp()) {
-      // Initialize the frame SDK
-      await frameSDK.actions.ready();
+      await sdk.actions.ready();
       logger.info("MiniApp: initialized successfully");
       return true;
     }
@@ -69,7 +56,7 @@ export async function getUserContext() {
       return null;
     }
 
-    const context = await frameSDK.context;
+    const context = await sdk.context;
     return {
       user: context?.user || null,
       client: context?.client || null,
@@ -91,7 +78,7 @@ export async function shareToFarcaster(text: string, embeds?: string[]) {
       return false;
     }
 
-    await frameSDK.actions.openUrl(
+    await sdk.actions.openUrl(
       `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${embeds?.join(",") || ""}`,
     );
     return true;
@@ -107,7 +94,7 @@ export async function shareToFarcaster(text: string, embeds?: string[]) {
 export async function closeMiniApp() {
   try {
     if (isInMiniApp()) {
-      await frameSDK.actions.close();
+      await sdk.actions.close();
     }
   } catch (error) {
     console.error("Failed to close Mini App:", error);
@@ -121,7 +108,7 @@ export async function openUrl(url: string, external = false) {
   try {
     if (isInMiniApp()) {
       if (external) {
-        await frameSDK.actions.openUrl(url);
+        await sdk.actions.openUrl(url);
       } else {
         // Open within the Mini App context
         window.location.href = url;
@@ -154,8 +141,8 @@ export function trackEvent(
       });
 
       // If client supports custom events, send them
-      // Note: frameSDK.context is a Promise, so we'd need to await it
-      // For now, we'll just log it
+      // The Mini App SDK does not expose custom analytics events; retain
+      // structured local logging and the regular analytics fallback below.
     }
 
     // Fallback to regular analytics if available
