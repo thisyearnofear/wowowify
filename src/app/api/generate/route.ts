@@ -4,8 +4,8 @@ import { logger } from "@/lib/logger";
 import { headers } from "next/headers";
 import { incrementTotalRequests, incrementFailedRequests } from "@/lib/metrics";
 
-const ALLOWED_MODELS = ["stable-diffusion-3.5", "fluently-xl"] as const;
-const DEFAULT_MODEL = "stable-diffusion-3.5";
+const ALLOWED_MODELS = ["venice-sd35", "flux-2-pro", "hidream"] as const;
+const DEFAULT_MODEL = "venice-sd35";
 const TIMEOUT_MS = 10000; // 10 seconds timeout - Vercel has 10s limit
 
 // Mark the route as dynamic to prevent static optimization
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
       const apiUrl = new URL("https://api.venice.ai/api/v1/image/generate").toString();
       
       // Add model-specific timeout adjustments
-      if (model === "stable-diffusion-3.5") {
+      if (model === "venice-sd35") {
         // For slower models, reduce batch size and increase timeout
         options.body = JSON.stringify({
           ...JSON.parse(options.body),

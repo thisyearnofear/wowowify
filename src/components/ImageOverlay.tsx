@@ -207,7 +207,7 @@ export default function ImageOverlay() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt,
-            model: "stable-diffusion-3.5",
+            model: "venice-sd35",
             hide_watermark: true,
           }),
         });

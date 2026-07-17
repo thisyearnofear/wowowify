@@ -14,7 +14,7 @@
 import { logger } from "@/lib/logger";
 
 const VENICE_API_URL = "https://api.venice.ai/api/v1/image/generate";
-const VENICE_MODEL = "stable-diffusion-3.5";
+const VENICE_MODEL = "venice-sd35";
 const VENICE_WIDTH = 512;
 const VENICE_HEIGHT = 512;
 
