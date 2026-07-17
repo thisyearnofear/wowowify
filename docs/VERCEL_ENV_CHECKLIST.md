@@ -13,7 +13,7 @@ Each env var below is a known fixed dependency of a route in `src/app/api/`. Pro
 | `wowowify` | Studio + Mini App | `studio` or `all` |
 | `wowowify-asp` | API-only ASP | `asp` |
 
-Both projects should share **`toka-blob`** (public) — same `BLOB_READ_WRITE_TOKEN` + `BLOB_STORE_ID`. Legacy private `wowowify-blob` must not receive new writes.
+Both projects should use **`toka-blob`** (public) — same `BLOB_READ_WRITE_TOKEN` + `BLOB_STORE_ID`. The legacy private `wowowify-blob` store was removed; do not recreate a private store for this app.
 
 ---
 

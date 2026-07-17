@@ -34,12 +34,7 @@ Studio (`wowowify`) tolerates git deploys normally; the ASP restriction is stric
 
 ## Shared Blob storage (`toka-blob`)
 
-Both projects use one **public** Vercel Blob store so `put(…, { access: "public" })` in `src/lib/image-store.ts` succeeds on Studio and ASP.
-
-| Store | ID | Access | Projects |
-|---|---|---|---|
-| `toka-blob` | `store_s9IKHju2Z1m5gMx7` | **Public** | `wowowify`, `wowowify-asp` |
-| ~~`wowowify-blob`~~ | legacy | Private | deprecated — do not use for new writes |
+Both projects use one **public** Vercel Blob store (`toka-blob`, `store_s9IKHju2Z1m5gMx7`) so `put(…, { access: "public" })` in `src/lib/image-store.ts` succeeds on Studio and ASP.
 
 ### Linking the store to a second project
 
