@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import type { CampaignDraft } from "@/lib/campaign-drafts";
+import { getProvenanceNetwork } from "@/lib/commerce-config";
 import { logger } from "@/lib/logger";
 import {
   executeWithTimeout,
@@ -23,7 +24,7 @@ export interface ProvenanceSpec {
 
 export interface ProvenanceReceipt {
   receiptId: string;
-  network: "lisk-offchain";
+  network: string;
   specHash: string;
   assetHash: string;
   spec: ProvenanceSpec;
@@ -81,13 +82,13 @@ export async function issueProvenanceReceipt(
     spec.assetUrls?.length ? spec.assetUrls : spec.resultUrl ? [spec.resultUrl] : [];
   const receipt: ProvenanceReceipt = {
     receiptId: uuidv4(),
-    network: "lisk-offchain",
+    network: getProvenanceNetwork(),
     specHash: hashValue(spec),
     assetHash: hashValue(assetFingerprint),
     spec,
     issuedAt: new Date().toISOString(),
     note:
-      "Off-chain campaign provenance receipt. Source logos and private inputs are not placed onchain.",
+      "Off-chain campaign provenance receipt. Source logos and private inputs are not placed onchain unless a deployment opts in.",
   };
   await storeReceipt(receipt);
   return receipt;

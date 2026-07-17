@@ -7,7 +7,7 @@ Single source of truth for how humans and AI agents collaborate on this codebase
 1. **ENHANCEMENT FIRST** — extend existing components before creating new ones.
 2. **CONSOLIDATION** — delete code, never deprecate it (deprecation = debt).
 3. **PREVENT BLOAT** — auditing > features.
-4. **DRY** — single source of truth (`src/lib/env.ts` is the canonical APP_URL/APP_ORIGIN/IS_PRODUCTION home; `src/lib/web3/config.ts` owns the Wagmi chain list + ConnectKit theme; never hardcode literals in components or routes).
+4. **DRY** — single source of truth (`src/lib/env.ts` is the canonical APP_URL/APP_ORIGIN/IS_PRODUCTION home; `src/lib/commerce-config.ts` and `src/lib/deployment.ts` own chain-agnostic commerce and ASP/Studio split; never hardcode literals in components or routes).
 5. **CLEAN** — explicit dependencies, no hidden coupling via globals.
 6. **MODULAR** — small, independently-testable units.
 7. **PERFORMANT** — Vercel cold starts matter; prefer fire-and-return over polling.
@@ -62,7 +62,8 @@ npm run vercel-install          # build-time install; uses Socket + legacy peer 
 | Concern | Single source |
 |---|---|
 | `APP_URL`, `APP_ORIGIN`, `IS_PRODUCTION`, `APP_ICON_URL` | `src/lib/env.ts` |
-| Wagmi chain list + RPC transports + ConnectKit theme | `src/lib/web3/config.ts` |
+| Commerce / provenance network env | `src/lib/commerce-config.ts` |
+| ASP vs Studio deployment | `src/lib/deployment.ts` |
 | `/api/replicate` ↔ castHash bookkeeping | `src/lib/predictions.ts` |
 | Toast surface | `src/components/ui/Toast.tsx` (`useToast()` hook) |
 | HMAC verification | `crypto.timingSafeEqual` with length guard — never `===` |
@@ -82,7 +83,6 @@ If you find yourself importing the same boilerplate in two files, the third file
 
 ## Don't
 
-- Don't reimplement providers split across multiple files (we have one `providers/Web3Provider.tsx`).
 - Don't hardcode URLs — import from `@/lib/env`.
 - Don't bring back the 10-minute self-recursive Replicate poll — it's forbidden by Vercel function timeouts.
 - Don't `console.error` in production routes — use `logger.error` with structured context.

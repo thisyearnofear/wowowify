@@ -5,8 +5,9 @@ import { mergeBrandKitIntoCommand } from "@/lib/brand-kits";
 import { buildStudioUrl } from "@/lib/studio-url";
 import { getAgentCapabilityCard } from "@/lib/agent-capability-card";
 import {
-  LISK_LAUNCH_KIT_ID,
-  buildLiskLaunchKit,
+  DEMO_LAUNCH_KIT_ID,
+  buildDemoLaunchKit,
+  getSeedBrandKit,
 } from "@/lib/brand-kits-seed";
 
 describe("getFormatCropDimensions", () => {
@@ -77,6 +78,12 @@ describe("buildStudioUrl", () => {
   });
 });
 
+describe("getSeedBrandKit", () => {
+  it("resolves legacy launch kit ids to the demo kit", () => {
+    expect(getSeedBrandKit("lisk-launch")?.id).toBe(DEMO_LAUNCH_KIT_ID);
+  });
+});
+
 describe("getAgentCapabilityCard", () => {
   it("exposes discovery and demo brand kit", () => {
     const card = getAgentCapabilityCard("https://toka.example");
@@ -84,15 +91,15 @@ describe("getAgentCapabilityCard", () => {
       "https://toka.example/.well-known/agent.json",
     );
     expect(card.endpoints.service).toBe("https://toka.example/api/agent");
-    expect(card.demo.brandKitId).toBe(LISK_LAUNCH_KIT_ID);
+    expect(card.demo.brandKitId).toBe(DEMO_LAUNCH_KIT_ID);
   });
 });
 
-describe("buildLiskLaunchKit", () => {
+describe("buildDemoLaunchKit", () => {
   it("ships square, landscape, and portrait defaults", () => {
-    const kit = buildLiskLaunchKit("https://toka.example");
-    expect(kit.id).toBe(LISK_LAUNCH_KIT_ID);
+    const kit = buildDemoLaunchKit("https://toka.example");
+    expect(kit.id).toBe(DEMO_LAUNCH_KIT_ID);
     expect(kit.formats).toEqual(["square", "landscape", "portrait"]);
-    expect(kit.logoUrl).toContain("/lisk/lisk-mark.svg");
+    expect(kit.logoUrl).toContain("/demo/launch-mark.svg");
   });
 });

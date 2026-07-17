@@ -33,7 +33,7 @@ export const STUDIO_COPY = {
   brandKit: {
     load: "Load brand kit",
     save: "Save brand kit",
-    namePlaceholder: "Kit name (e.g. Lisk Launch)",
+    namePlaceholder: "Kit name (e.g. Demo Launch)",
     empty: "No saved brand kits yet.",
     saved: "Brand kit saved.",
     loaded: "Brand kit loaded.",

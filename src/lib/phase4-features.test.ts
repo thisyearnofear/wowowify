@@ -16,7 +16,7 @@ describe("campaign drafts", () => {
     const draft = await saveCampaignDraft({
       command: "Launch visual",
       brief: "Launch visual",
-      brandKitId: "lisk-launch",
+      brandKitId: "demo-launch",
       logoUrl: "https://example.com/logo.png",
       previewUrl: "https://example.com/preview.png",
       status: "completed",
@@ -27,7 +27,7 @@ describe("campaign drafts", () => {
 
     const loaded = await getCampaignDraft(draft.id);
     expect(loaded?.brief).toBe("Launch visual");
-    expect(loaded?.brandKitId).toBe("lisk-launch");
+    expect(loaded?.brandKitId).toBe("demo-launch");
   });
 
   it("buildStudioReviewUrl encodes draft id", () => {
@@ -69,7 +69,7 @@ describe("provenance receipts", () => {
     });
     const spec = buildProvenanceSpecFromDraft(draft);
     const receipt = await issueProvenanceReceipt(spec);
-    expect(receipt.network).toBe("lisk-offchain");
+    expect(receipt.network).toBe("offchain");
     expect(receipt.specHash).toHaveLength(64);
     expect(receipt.assetHash).toHaveLength(64);
   });
@@ -114,5 +114,6 @@ describe("getAgentCapabilityCard", () => {
     expect(card.endpoints.studio).toBe("https://studio.example");
     expect(card.endpoints.uploadLogo).toBe("https://asp.example/api/upload-logo");
     expect(card.output.draftId).toContain("draft");
+    expect(card.endpoints.entitlements).toBe("https://asp.example/api/entitlements");
   });
 });

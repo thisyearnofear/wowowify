@@ -12,7 +12,7 @@
 
 The Studio supports bring-your-own-logo composition. External agents can provide a public `logoUrl` to `POST /api/agent`, upload a logo first via `POST /api/upload-logo`, or reference a saved `brandKitId`. Community overlays remain available as quick-start presets. Agents can hand a draft to a person for final review in Studio.
 
-Wallet interaction is optional and reserved for a future X Layer campaign payment, entitlement, or delivery receipt. It is not required to create or share artwork.
+Wallet interaction is optional and reserved for future campaign payment, entitlement, or delivery receipts on a deployment-configured chain. It is not required to create or share artwork.
 
 ## Agent API (preferred for bots)
 
@@ -26,7 +26,7 @@ curl -X POST https://your-asp-host/api/agent \
   -d '{
     "command": "Generate a vibrant community launch visual",
     "parameters": {
-      "brandKitId": "lisk-launch",
+      "brandKitId": "demo-launch",
       "formats": ["square", "landscape", "portrait"],
       "text": {
         "content": "THE FUTURE SHIPS TODAY",
@@ -59,9 +59,11 @@ Pass `parameters.formats`: `square`, `landscape`, `portrait`, `story`, `banner`.
 
 ### Optional commerce & provenance
 
-- **x402** — set `X402_ENABLED=true` on ASP; paid calls require `X-PAYMENT` header (402 challenge otherwise).
-- **X Layer entitlements** — `POST /api/entitlements/xlayer` with `{ "draftId": "…" }` records an optional delivery receipt stub.
-- **Lisk provenance** — `POST /api/provenance` with `{ "draftId": "…" }` returns an off-chain specHash + assetHash receipt (no source logos onchain).
+Commerce is **chain-agnostic** — set env vars per deployment. Example for [OKX AI ASP](https://www.okx.ai/tutorial/asp): register A2MCP with this service, use x402 on your chosen network (e.g. X Layer).
+
+- **x402** — set `X402_ENABLED=true` on ASP; paid calls require `X-PAYMENT` header (`X402_NETWORK` names the settlement chain).
+- **Entitlements** — `POST /api/entitlements` with `{ "draftId": "…" }` records an optional delivery receipt stub (`ENTITLEMENT_NETWORK`).
+- **Provenance** — `POST /api/provenance` with `{ "draftId": "…" }` returns an off-chain specHash + assetHash receipt (`PROVENANCE_NETWORK`, default `offchain`).
 
 ## Farcaster bot commands
 

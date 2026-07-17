@@ -4,7 +4,7 @@
  * ClientRoot — the single client-only boundary under the root layout.
  *
  * Wraps children with the shared ToastContainer. Wallet interaction is an
- * explicit, future X Layer action rather than a global app dependency.
+ * Wallet providers load only when a user requests an explicit onchain action.
  *
  * Must be a client component because toast state is interactive. The root
  * layout imports this once.

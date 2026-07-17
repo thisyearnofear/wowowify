@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getX402Network } from "@/lib/commerce-config";
 
 export interface X402Challenge {
   scheme: "x402";
@@ -21,7 +22,7 @@ export function checkAgentPayment(request: Request): Response | null {
       scheme: "x402",
       price: process.env.X402_PRICE_USDC || "0.01",
       currency: "USDC",
-      network: process.env.X402_NETWORK || "x-layer",
+      network: getX402Network(),
       payTo: process.env.X402_PAYTO_ADDRESS || "",
       resource: "POST /api/agent",
     };

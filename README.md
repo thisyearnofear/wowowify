@@ -24,21 +24,31 @@ An agent should be able to send a collaborator to a prefilled Studio brief for r
 
 The product promise is simple: AI creates the visual world; @toka preserves the exact logo, campaign copy, and composition rules.
 
-## Ecosystem Commitments
+## Ecosystem & commerce (chain-agnostic)
 
-**Lisk** is @toka's founding ecosystem and first community launch partner. We will demonstrate brand kits and campaign workflows for Lisk creators, communities, and launches. Later, when customers need it, a Lisk provenance record can attest to a finished campaign specification and asset hash without putting source logos or private inputs onchain.
+@toka is **chain-agnostic by design**. Image generation, logo composition, drafts, and human approval in Studio work without a wallet or any chain.
 
-**OKX and X Layer** are the current commerce and interaction focus. The Studio will offer an explicit, optional X Layer action for a useful campaign entitlement, payment, or delivery receipt. Wallet software must load only when a user requests that action; it is not a requirement for creating artwork.
+Optional onchain layers are **deployment-specific** — configure env vars per marketplace or partner:
 
-We do not mint every image or force users through a wallet flow. Onchain actions must represent a concrete entitlement, payment, or verifiable delivery event.
+| Concern | Env var | Example (OKX AI) |
+|---|---|---|
+| Paid agent calls (x402) | `X402_ENABLED`, `X402_NETWORK`, `X402_PAYTO_ADDRESS` | `X402_NETWORK=x-layer` |
+| Delivery / entitlement receipt | `ENTITLEMENT_NETWORK` | `ENTITLEMENT_NETWORK=x-layer` |
+| Campaign provenance label | `PROVENANCE_NETWORK` | `PROVENANCE_NETWORK=offchain` (default) |
+
+**OKX AI ASP** is the primary agent marketplace integration path: register as **A2MCP** with `GET /.well-known/agent.json` and `POST /api/agent`. See [okx.ai/tutorial/asp](https://www.okx.ai/tutorial/asp). Free endpoints return results directly; paid endpoints use x402 (OKX Payment SDK on your chosen network).
+
+We do not mint every image or force users through a wallet flow. Onchain actions must represent a concrete entitlement, payment, or verifiable delivery event — never “mint this PNG.”
+
+Future deployments on other chains (e.g. Lisk) reuse the same ASP contract; only commerce env vars and marketplace registration change.
 
 ## Delivery Roadmap
 
 1. Ship the human Studio and public brand-safe A2MCP service from the same composition contract.
 2. Add saved brand kits and multi-format campaign output.
 3. Let agents create drafts that open in Studio for human approval.
-4. Add paid agent usage through ACP/x402 and a focused, optional X Layer interaction.
-5. Add Lisk campaign provenance only where it delivers customer value.
+4. Add paid agent usage through ACP/x402 and optional entitlement receipts (network via env).
+5. Add campaign provenance receipts where customers need verifiable delivery metadata.
 
 ## Deployment Boundary
 
@@ -335,8 +345,7 @@ The application requires the following environment variables:
 
 ```bash
 VENICE_API_KEY=your_venice_api_key
-UPSTASH_REDIS_REST_URL=your_upstash_redis_rest_url
-UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
+REDIS_URL=rediss://<user>:<token>@<host>.upstash.io:6379
 BLOB_READ_WRITE_TOKEN=your_vercel_blob_token  # Required for production image persistence
 NEYNAR_API_KEY=your_neynar_api_key
 NEYNAR_WEBHOOK_SECRET=your_neynar_webhook_secret
@@ -344,13 +353,26 @@ FARCASTER_BOT_FID=your_bot_fid
 FARCASTER_SIGNER_UUID=your_farcaster_signer_uuid
 NEXT_PUBLIC_ADMIN_PASSWORD=your_admin_password  # Optional, defaults to "wowowify"
 
+# ASP / Studio split (optional)
+TOKA_DEPLOYMENT=all          # all | asp | studio
+ASP_URL=https://your-asp-host
+STUDIO_URL=https://your-studio-host
+
+# Optional commerce — chain-agnostic; set per marketplace deployment
+X402_ENABLED=false
+X402_NETWORK=                # e.g. x-layer for OKX AI
+X402_PAYTO_ADDRESS=
+X402_PRICE_USDC=0.01
+ENTITLEMENT_NETWORK=           # e.g. x-layer when recording delivery receipts
+PROVENANCE_NETWORK=offchain    # label on provenance receipts
+
 # Pre-launch hardening walkthrough: see docs/VERCEL_ENV_CHECKLIST.md.
 ```
 
 You can obtain these from:
 
 - Venice AI API key: [Venice AI Dashboard](https://venice.ai)
-- Upstash Redis REST: [Upstash Console](https://console.upstash.com) — create a Redis DB and copy the REST URL + token
+- Upstash Redis: [Upstash Console](https://console.upstash.com) — copy the **Redis URL** (`rediss://…`) into `REDIS_URL`
 - Vercel Blob token: [Vercel Blob Dashboard](https://vercel.com/dashboard/stores) — create a Blob store and copy the read/write token
 - Neynar API key: [Neynar Developer Portal](https://neynar.com)
 - Webhook secret: set when configuring webhook URL in Neynar dashboard

@@ -1,17 +1,20 @@
 import { APP_URL } from "@/lib/env";
 import type { BrandKit } from "@/lib/brand-kits";
 
-/** Stable id for the demo Lisk community launch kit — safe to reference in docs and deep links. */
-export const LISK_LAUNCH_KIT_ID = "lisk-launch";
+/** Stable id for the bundled demo launch kit — safe to reference in docs and deep links. */
+export const DEMO_LAUNCH_KIT_ID = "demo-launch";
 
-export function buildLiskLaunchKit(appUrl: string = APP_URL): BrandKit {
+/** @deprecated Legacy alias — resolves to the same demo kit. */
+export const LEGACY_LAUNCH_KIT_IDS = ["lisk-launch"] as const;
+
+export function buildDemoLaunchKit(appUrl: string = APP_URL): BrandKit {
   const now = new Date().toISOString();
   return {
-    id: LISK_LAUNCH_KIT_ID,
-    name: "Lisk Launch",
-    logoUrl: `${appUrl}/lisk/lisk-mark.svg`,
+    id: DEMO_LAUNCH_KIT_ID,
+    name: "Demo Launch",
+    logoUrl: `${appUrl}/demo/launch-mark.svg`,
     text: {
-      content: "BUILD ON LISK",
+      content: "LAUNCH NOW",
       position: "bottom",
       fontSize: 48,
       color: "white",
@@ -29,10 +32,15 @@ export function buildLiskLaunchKit(appUrl: string = APP_URL): BrandKit {
   };
 }
 
-export const SEED_BRAND_KIT_BUILDERS = [buildLiskLaunchKit] as const;
+export const SEED_BRAND_KIT_BUILDERS = [buildDemoLaunchKit] as const;
 
 export function getSeedBrandKit(id: string, appUrl: string = APP_URL): BrandKit | null {
-  if (id === LISK_LAUNCH_KIT_ID) return buildLiskLaunchKit(appUrl);
+  if (
+    id === DEMO_LAUNCH_KIT_ID ||
+    (LEGACY_LAUNCH_KIT_IDS as readonly string[]).includes(id)
+  ) {
+    return buildDemoLaunchKit(appUrl);
+  }
   return null;
 }
 

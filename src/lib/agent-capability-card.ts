@@ -1,5 +1,10 @@
 import { CAMPAIGN_FORMATS } from "@/lib/agent-types";
-import { LISK_LAUNCH_KIT_ID } from "@/lib/brand-kits-seed";
+import { DEMO_LAUNCH_KIT_ID } from "@/lib/brand-kits-seed";
+import {
+  getEntitlementNetwork,
+  getProvenanceNetwork,
+  getX402Network,
+} from "@/lib/commerce-config";
 import { ASP_URL, STUDIO_URL } from "@/lib/deployment";
 
 /** Public ASP / A2MCP capability card — shared by GET /api/agent and /.well-known/agent.json */
@@ -10,7 +15,7 @@ export function getAgentCapabilityCard(
   return {
     schema: "toka/agent-capability/v1",
     name: "@toka Agentic Brand Studio",
-    version: "1.1.0",
+    version: "1.2.0",
     description:
       "Creates publication-ready, brand-safe creative from a campaign brief and an exact logo.",
     protocol: "A2MCP",
@@ -29,7 +34,7 @@ export function getAgentCapabilityCard(
       uploadLogo: `${aspUrl}/api/upload-logo`,
       drafts: `${aspUrl}/api/drafts/{id}`,
       provenance: `${aspUrl}/api/provenance`,
-      entitlements: `${aspUrl}/api/entitlements/xlayer`,
+      entitlements: `${aspUrl}/api/entitlements`,
     },
     input: {
       command:
@@ -37,7 +42,7 @@ export function getAgentCapabilityCard(
       parameters: {
         logoUrl:
           "public HTTP(S) image URL for an exact brand mark (optional — or POST /api/upload-logo first)",
-        brandKitId: `saved brand kit id (optional — demo kit: "${LISK_LAUNCH_KIT_ID}")`,
+        brandKitId: `saved brand kit id (optional — demo kit: "${DEMO_LAUNCH_KIT_ID}")`,
         baseImageUrl: "public HTTP(S) image URL (optional)",
         prompt: "string override for extracted brief (optional)",
         overlayMode: "community preset name (optional)",
@@ -66,22 +71,24 @@ export function getAgentCapabilityCard(
         header: "X-PAYMENT",
         price: process.env.X402_PRICE_USDC || "0.01",
         currency: "USDC",
-        network: process.env.X402_NETWORK || "x-layer",
+        network: getX402Network() || null,
       },
-      xLayerEntitlements: `${aspUrl}/api/entitlements/xlayer`,
+      entitlements: `${aspUrl}/api/entitlements`,
+      entitlementNetwork: getEntitlementNetwork() || null,
     },
     provenance: {
-      liskOffchain: `${aspUrl}/api/provenance`,
+      offchain: `${aspUrl}/api/provenance`,
+      network: getProvenanceNetwork(),
       description:
-        "Optional off-chain receipt with specHash + assetHash — no source logos onchain.",
+        "Optional receipt with specHash + assetHash. Chain binding is deployment-specific; source logos stay offchain by default.",
     },
     demo: {
-      brandKitId: LISK_LAUNCH_KIT_ID,
+      brandKitId: DEMO_LAUNCH_KIT_ID,
       exampleRequest: {
         command:
           "Generate a vibrant community launch visual with optimistic lighting",
         parameters: {
-          brandKitId: LISK_LAUNCH_KIT_ID,
+          brandKitId: DEMO_LAUNCH_KIT_ID,
           formats: ["square", "landscape", "portrait"],
         },
       },

@@ -11,10 +11,10 @@ import { APP_URL } from "@/lib/env";
 import {
   getSeedBrandKit,
   listSeedBrandKits,
-  LISK_LAUNCH_KIT_ID,
+  DEMO_LAUNCH_KIT_ID,
 } from "@/lib/brand-kits-seed";
 
-export { LISK_LAUNCH_KIT_ID };
+export { DEMO_LAUNCH_KIT_ID };
 
 const BRAND_KIT_PREFIX = "brand_kit:";
 const BRAND_KIT_INDEX = "brand_kits:index";

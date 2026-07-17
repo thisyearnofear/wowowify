@@ -1,6 +1,6 @@
 # Legacy Web3 & NFT Integration (archived)
 
-This document preserves historical integration notes removed from the main README during the @toka Agentic Brand Studio pivot. **NFT minting UI and wallet flows are no longer part of the Studio product.** Wallet interaction remains optional and reserved for future campaign entitlements on X Layer.
+This document preserves historical integration notes removed from the main README during the @toka Agentic Brand Studio pivot. **NFT minting UI and wallet flows are no longer part of the Studio product.** Wallet interaction remains optional and reserved for future campaign entitlements on a deployment-configured chain.
 
 ## Grove Integration
 
