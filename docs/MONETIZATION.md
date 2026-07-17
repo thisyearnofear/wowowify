@@ -36,6 +36,28 @@ curl -s https://api.wowowify.persidian.com/api/metrics | jq '.agentUsage'
 
 Set a **Venice dashboard spend alert** manually (Venice console) — the repo cannot do this for you.
 
+### Image generation reliability
+
+| Provider | Role | Model | ~Cost @ 512² |
+|---|---|---|---|
+| **Venice** | Primary | `venice-sd35` | ~$0.02–0.05 (verify dashboard) |
+| **Runware** | Fallback | `runware:100@1` (FLUX Schnell) | ~$0.0006 |
+| Runware alt | Faster / prompt-tight | `prunaai:1@1` (P-Image) | ~$0.0044 @ 1024² |
+
+Pipeline: `generateImageWithFallback()` tries Venice first; on failure uses Runware when `RUNWARE_API_KEY` is set. Set `IMAGE_GEN_RUNWARE_FALLBACK=false` to disable.
+
+**Runware wallet:** API key auth works before credits are loaded; generations return `Insufficient credits` until you top up at [my.runware.ai/wallet](https://my.runware.ai/wallet).
+
+Other Runware models worth knowing (not wired as defaults):
+
+| Model ID | Best for | Price signal |
+|---|---|---|
+| `runware:101@1` | FLUX Dev — higher quality, slower | Higher than Schnell |
+| `recraft:v4.1-pro@0` | Brand/design polish, logos | ~$0.21 / image |
+| `xai:grok-imagine@image-quality` | Premium creative | ~$0.05 / image |
+
+For Wowowify campaign **backgrounds** (logo composited separately), FLUX Schnell is the right fallback: fast, cheap, no embedded text.
+
 ---
 
 ## Env vars (ASP production)

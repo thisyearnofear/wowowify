@@ -38,7 +38,7 @@ import {
 import { composeImage } from "./overlay-composer";
 import { archiveResult } from "./result-archiver";
 import { downloadImage as fetchImageBuffer } from "./image-fetcher";
-import { generateImage as callVenice } from "./venice-client";
+import { generateImageWithFallback } from "./image-generation";
 import { ghibliService } from "./ghibli-service";
 import {
   applyParentImageContext,
@@ -273,13 +273,13 @@ export class CommandRouter {
       return fetchImageBuffer(parsedCommand.baseImageUrl, abortSignal);
     }
     if (parsedCommand.prompt) {
-      return callVenice(parsedCommand.prompt, abortSignal);
+      return (await generateImageWithFallback(parsedCommand.prompt, abortSignal)).buffer;
     }
     if (parsedCommand.overlayMode) {
       const defaultPrompt =
         DEFAULT_OVERLAY_PROMPTS[parsedCommand.overlayMode] ||
         "a simple background";
-      return callVenice(defaultPrompt, abortSignal);
+      return (await generateImageWithFallback(defaultPrompt, abortSignal)).buffer;
     }
     throw new Error("No base image URL or prompt provided");
   }

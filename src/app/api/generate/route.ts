@@ -3,6 +3,7 @@ import { getRateLimitInfo } from "@/lib/rate-limiter";
 import { logger } from "@/lib/logger";
 import { headers } from "next/headers";
 import { incrementTotalRequests, incrementFailedRequests } from "@/lib/metrics";
+import { generateImageWithFallback } from "@/lib/services/image-generation";
 
 const ALLOWED_MODELS = ["venice-sd35", "flux-2-pro", "hidream"] as const;
 const DEFAULT_MODEL = "venice-sd35";
@@ -48,9 +49,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate API configuration
-    if (!process.env.VENICE_API_KEY) {
-      logger.error("VENICE_API_KEY is not configured");
+    const hasVenice = Boolean(process.env.VENICE_API_KEY?.trim());
+    const hasRunware = Boolean(process.env.RUNWARE_API_KEY?.trim());
+    if (!hasVenice && !hasRunware) {
+      logger.error("No image generation provider configured");
       incrementFailedRequests().catch(() => {});
       return NextResponse.json(
         { error: "Server configuration error" },
@@ -103,66 +105,33 @@ export async function POST(request: Request) {
       promptLength: prompt.length,
     });
 
-    // API request configuration
-    const options = {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.VENICE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        hide_watermark,
-        model,
-        prompt,
-        format: "png",
+    try {
+      const result = await generateImageWithFallback(prompt, controller.signal, {
         width: 768,
         height: 768,
-      }),
-    };
-
-    try {
-      // Use fetch with runtime configuration
-      const apiUrl = new URL("https://api.venice.ai/api/v1/image/generate").toString();
-      
-      // Add model-specific timeout adjustments
-      if (model === "venice-sd35") {
-        // For slower models, reduce batch size and increase timeout
-        options.body = JSON.stringify({
-          ...JSON.parse(options.body),
-          batch_size: 1, // Reduce batch size to speed up generation
-        });
-      }
-
-      const response = await fetch(apiUrl, {
-        ...options,
-        signal: controller.signal,
       });
 
       clearTimeout(timeout);
 
-      const responseText = await response.text();
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (error) {
-        logger.error("Failed to parse Venice API response", {
-          status: response.status,
-          statusText: response.statusText,
-          responseText,
-          error:
-            error instanceof Error ? error.message : "Unknown parsing error",
-        });
-        throw new Error("Invalid response from image generation service");
-      }
+      logger.info("Image generation successful", {
+        ip,
+        provider: result.provider,
+        model: result.model,
+        costUsd: result.costUsd,
+      });
 
-      if (!response.ok) {
-        throw new Error(
-          `Venice API error: ${data.error || response.statusText}`
-        );
-      }
-
-      logger.info("Image generation successful", { ip });
-      return NextResponse.json(data, { headers: responseHeaders });
+      return NextResponse.json(
+        {
+          images: [result.buffer.toString("base64")],
+          provider: result.provider,
+          model: result.model,
+          ...(result.costUsd != null ? { costUsd: result.costUsd } : {}),
+          // Legacy field for Studio UI (still requests venice-sd35)
+          requestedModel: model,
+          hide_watermark,
+        },
+        { headers: responseHeaders },
+      );
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         logger.error("Request timeout", { ip });
@@ -176,7 +145,7 @@ export async function POST(request: Request) {
         );
       }
 
-      logger.error("Venice API error", {
+      logger.error("Image generation error", {
         error: error instanceof Error ? error.message : "Unknown error",
         ip,
       });
