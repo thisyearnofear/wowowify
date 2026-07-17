@@ -1,6 +1,7 @@
-import { APP_URL } from "@/lib/env";
-
 export type DeploymentMode = "all" | "asp" | "studio";
+
+const DEFAULT_APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://wowowify.vercel.app";
 
 /** Runtime deployment shape — `asp` serves API-only; `studio` serves the full app. */
 export function getDeploymentMode(): DeploymentMode {
@@ -19,10 +20,10 @@ export function isStudioDeployment(): boolean {
 }
 
 export const ASP_URL: string =
-  process.env.ASP_URL?.trim() || APP_URL;
+  process.env.ASP_URL?.trim() || DEFAULT_APP_URL;
 
 export const STUDIO_URL: string =
-  process.env.STUDIO_URL?.trim() || APP_URL;
+  process.env.STUDIO_URL?.trim() || DEFAULT_APP_URL;
 
 /** Routes allowed when TOKA_DEPLOYMENT=asp */
 export const ASP_ALLOWED_PREFIXES = [
