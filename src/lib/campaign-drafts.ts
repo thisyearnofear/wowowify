@@ -3,6 +3,11 @@ import type { CampaignAsset, CampaignFormat } from "@/lib/agent-types";
 import type { BrandKitControls, BrandKitText } from "@/lib/brand-kits";
 import { logger } from "@/lib/logger";
 import {
+  hasKvRestEnv,
+  kvGetStringWithFallback,
+  kvSetStringWithFallback,
+} from "@/lib/kv-store";
+import {
   executeWithTimeout,
   getInMemoryData,
   getRedisClient,
@@ -39,64 +44,113 @@ export type CampaignDraftInput = Omit<
   "id" | "studioReviewUrl" | "createdAt" | "updatedAt"
 > & { id?: string };
 
-async function readDraft(id: string): Promise<CampaignDraft | null> {
-  const key = `${DRAFT_PREFIX}${id}`;
-  if (process.env.REDIS_URL) {
-    try {
-      const redis = getRedisClient();
-      const raw = await executeWithTimeout(() => redis.get(key), 8000);
-      if (!raw) return null;
-      return JSON.parse(raw) as CampaignDraft;
-    } catch (error) {
-      logger.error("Draft read failed", {
-        id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      if (IS_PRODUCTION) {
-        throw error;
-      }
-    }
-  } else if (IS_PRODUCTION) {
-    throw new Error(
-      "Draft storage unavailable: REDIS_URL is not configured in production.",
-    );
+function hasDraftStorageEnv(): boolean {
+  return hasKvRestEnv() || Boolean(process.env.REDIS_URL?.trim());
+}
+
+async function readRawDraft(key: string): Promise<string | null> {
+  const readViaRedisUrl = async (): Promise<string | null> => {
+    if (!process.env.REDIS_URL?.trim()) return null;
+    const redis = getRedisClient();
+    return executeWithTimeout(() => redis.get(key), 8000);
+  };
+
+  if (hasKvRestEnv()) {
+    return kvGetStringWithFallback(key, readViaRedisUrl);
   }
 
-  const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
-  return drafts.find((draft) => draft.id === id) ?? null;
+  return readViaRedisUrl();
+}
+
+async function writeRawDraft(key: string, payload: string): Promise<void> {
+  const writeViaRedisUrl = async (): Promise<void> => {
+    if (!process.env.REDIS_URL?.trim()) {
+      throw new Error("REDIS_URL is not configured");
+    }
+    const redis = getRedisClient();
+    await executeWithTimeout(
+      () => redis.set(key, payload, "EX", DRAFT_TTL_SECONDS),
+      8000,
+    );
+  };
+
+  if (hasKvRestEnv()) {
+    await kvSetStringWithFallback(
+      key,
+      payload,
+      DRAFT_TTL_SECONDS,
+      writeViaRedisUrl,
+    );
+    return;
+  }
+
+  await writeViaRedisUrl();
+}
+
+async function readDraft(id: string): Promise<CampaignDraft | null> {
+  const key = `${DRAFT_PREFIX}${id}`;
+
+  if (!hasDraftStorageEnv()) {
+    if (IS_PRODUCTION) {
+      throw new Error(
+        "Draft storage unavailable: configure KV REST or REDIS_URL in production.",
+      );
+    }
+    const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
+    return drafts.find((draft) => draft.id === id) ?? null;
+  }
+
+  try {
+    const raw = await readRawDraft(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as CampaignDraft;
+  } catch (error) {
+    logger.error("Draft read failed", {
+      id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    if (IS_PRODUCTION) {
+      throw error;
+    }
+    const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
+    return drafts.find((draft) => draft.id === id) ?? null;
+  }
 }
 
 async function writeDraft(draft: CampaignDraft): Promise<void> {
   const key = `${DRAFT_PREFIX}${draft.id}`;
-  if (process.env.REDIS_URL) {
-    try {
-      const redis = getRedisClient();
-      await executeWithTimeout(
-        () => redis.set(key, JSON.stringify(draft), "EX", DRAFT_TTL_SECONDS),
-        8000,
+  const payload = JSON.stringify(draft);
+
+  if (!hasDraftStorageEnv()) {
+    if (IS_PRODUCTION) {
+      throw new Error(
+        "Draft storage unavailable: configure KV REST or REDIS_URL in production.",
       );
-      return;
-    } catch (error) {
-      logger.error("Draft write failed", {
-        id: draft.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      if (IS_PRODUCTION) {
-        throw new Error(
-          "Draft persistence failed: REDIS_URL is set but the draft could not be saved.",
-        );
-      }
     }
-  } else if (IS_PRODUCTION) {
-    throw new Error(
-      "Draft storage unavailable: REDIS_URL is not configured in production.",
-    );
+    const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
+    const next = drafts.filter((entry) => entry.id !== draft.id);
+    next.unshift(draft);
+    setInMemoryData("campaign_drafts:data", next.slice(0, 200));
+    return;
   }
 
-  const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
-  const next = drafts.filter((entry) => entry.id !== draft.id);
-  next.unshift(draft);
-  setInMemoryData("campaign_drafts:data", next.slice(0, 200));
+  try {
+    await writeRawDraft(key, payload);
+  } catch (error) {
+    logger.error("Draft write failed", {
+      id: draft.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    if (IS_PRODUCTION) {
+      throw new Error(
+        "Draft persistence failed: draft storage is configured but the write did not succeed.",
+      );
+    }
+    const drafts = getInMemoryData<CampaignDraft>("campaign_drafts:data");
+    const next = drafts.filter((entry) => entry.id !== draft.id);
+    next.unshift(draft);
+    setInMemoryData("campaign_drafts:data", next.slice(0, 200));
+  }
 }
 
 export function buildStudioReviewUrl(draftId: string): string {
