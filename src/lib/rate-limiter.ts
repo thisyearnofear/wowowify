@@ -1,53 +1,81 @@
 import { logger } from "./logger";
-import { getRedisClient, executeWithTimeout } from "./redis";
-
-const RATE_LIMIT_WINDOW = 3600; // 1 hour in seconds
-const MAX_REQUESTS = 20; // Maximum requests per window
+import {
+  getAgentRateLimitMax,
+  getAgentRateLimitWindowSeconds,
+} from "./agent-usage";
+import { hasKvRestEnv, kvIncrWithFallback } from "./kv-store";
+import { executeWithTimeout, getRedisClient } from "./redis";
 
 export interface RateLimitInfo {
   isAllowed: boolean;
   timeToReset: number;
   remaining?: number;
+  limit: number;
+}
+
+async function incrRateLimitKey(
+  key: string,
+  windowSeconds: number,
+): Promise<number> {
+  const incrViaRedisUrl = async (): Promise<number> => {
+    const redis = getRedisClient();
+    const count = await executeWithTimeout(() => redis.incr(key), 2000, 1);
+    if (count === 1) {
+      await executeWithTimeout(
+        () => redis.expire(key, windowSeconds),
+        2000,
+      );
+    }
+    return count;
+  };
+
+  if (hasKvRestEnv()) {
+    return kvIncrWithFallback(key, windowSeconds, incrViaRedisUrl);
+  }
+
+  return incrViaRedisUrl();
+}
+
+async function readRateLimitTtl(
+  key: string,
+  windowSeconds: number,
+): Promise<number> {
+  try {
+    if (process.env.REDIS_URL?.trim()) {
+      const redis = getRedisClient();
+      const ttl = await executeWithTimeout(() => redis.ttl(key), 2000, windowSeconds);
+      return ttl < 0 ? windowSeconds : ttl;
+    }
+  } catch {
+    // fall through
+  }
+  return windowSeconds;
 }
 
 export async function getRateLimitInfo(ip: string): Promise<RateLimitInfo> {
   const key = `rate_limit:${ip}`;
+  const maxRequests = getAgentRateLimitMax();
+  const windowSeconds = getAgentRateLimitWindowSeconds();
 
   try {
-    const redis = getRedisClient();
+    const count = await incrRateLimitKey(key, windowSeconds);
+    const timeToReset = await readRateLimitTtl(key, windowSeconds);
+    const isAllowed = count <= maxRequests;
+    const remaining = Math.max(0, maxRequests - count);
 
-    // Get the current count with timeout
-    const count = await executeWithTimeout(
-      () => redis.incr(key),
-      2000, // 2 second timeout
-      1 // Default to 1 if timeout
-    );
-
-    // If this is the first request, set expiry
-    if (count === 1) {
-      await executeWithTimeout(
-        () => redis.expire(key, RATE_LIMIT_WINDOW),
-        2000 // 2 second timeout
-      );
-    }
-
-    // Get TTL with timeout
-    const ttl = await executeWithTimeout(
-      () => redis.ttl(key),
-      2000, // 2 second timeout
-      RATE_LIMIT_WINDOW // Default to full window if timeout
-    );
-
-    const timeToReset = ttl < 0 ? RATE_LIMIT_WINDOW : ttl;
-    const isAllowed = count <= MAX_REQUESTS;
-    const remaining = Math.max(0, MAX_REQUESTS - count);
-
-    logger.info("Rate limit check", { ip, count, remaining, timeToReset });
+    logger.info("Rate limit check", {
+      ip,
+      count,
+      remaining,
+      timeToReset,
+      maxRequests,
+    });
 
     return {
       isAllowed,
       timeToReset,
       remaining,
+      limit: maxRequests,
     };
   } catch (error) {
     const errorMessage =
@@ -57,11 +85,11 @@ export async function getRateLimitInfo(ip: string): Promise<RateLimitInfo> {
       ip,
       timestamp: new Date().toISOString(),
     });
-    // If Redis fails, allow the request but log the error
     return {
       isAllowed: true,
-      timeToReset: RATE_LIMIT_WINDOW,
-      remaining: MAX_REQUESTS,
+      timeToReset: windowSeconds,
+      remaining: maxRequests,
+      limit: maxRequests,
     };
   }
 }

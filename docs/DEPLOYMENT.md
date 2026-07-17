@@ -73,6 +73,12 @@ Private stores + `access: "public"` fail with a Blob write error — migrate to 
 | `BLOB_STORE_ID` | `store_s9IKHju2Z1m5gMx7` | same | Required with OIDC on Vercel |
 | `VENICE_API_KEY` | ✓ | ✓ | Image generation |
 | `REDIS_URL` | ✓ | ✓ | Drafts, brand kits, rate limits |
+| `AGENT_RATE_LIMIT_MAX` | optional | optional | ASP: default 10/hr/IP on `/api/agent` |
+| `AGENT_DAILY_MAX` | optional | optional | ASP: default 100 completed gens/day (UTC) |
+| `X402_ENABLED` | optional | optional | `false` at launch; see [MONETIZATION.md](./MONETIZATION.md) |
+| `X402_NETWORK` | optional | ✓ | Pre-wire: `x-layer` |
+| `X402_PAYTO_ADDRESS` | optional | ✓ | Agentic Wallet EVM address |
+| `X402_PRICE_USDC` | optional | ✓ | Suggested: `0.05` when enabling paid calls |
 
 See also [VERCEL_ENV_CHECKLIST.md](./VERCEL_ENV_CHECKLIST.md) for smoke tests.
 

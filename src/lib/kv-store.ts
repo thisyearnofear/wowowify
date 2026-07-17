@@ -74,3 +74,46 @@ export async function kvSetStringWithFallback(
     await fallback();
   }
 }
+
+export async function kvIncrWithFallback(
+  key: string,
+  ttlSeconds: number,
+  fallback: () => Promise<number>,
+): Promise<number> {
+  if (!hasKvRestEnv()) {
+    return fallback();
+  }
+  try {
+    const client = getRestClient();
+    const count = await client.incr(key);
+    if (count === 1) {
+      await client.expire(key, ttlSeconds);
+    }
+    return count;
+  } catch (error) {
+    logger.warn("KV REST incr failed, falling back to Redis URL", {
+      key,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return fallback();
+  }
+}
+
+export async function kvDecrWithFallback(
+  key: string,
+  fallback: () => Promise<void>,
+): Promise<void> {
+  if (!hasKvRestEnv()) {
+    await fallback();
+    return;
+  }
+  try {
+    await getRestClient().decr(key);
+  } catch (error) {
+    logger.warn("KV REST decr failed, falling back to Redis URL", {
+      key,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await fallback();
+  }
+}

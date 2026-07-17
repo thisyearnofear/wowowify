@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { getMetrics } from "@/lib/metrics";
+import { getAgentUsageSnapshot } from "@/lib/agent-usage";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const { totalRequests, failedRequests, lastReset } = await getMetrics();
+  const agentUsage = await getAgentUsageSnapshot();
+  const url = new URL(request.url);
+
+  if (url.searchParams.get("format") === "json") {
+    return NextResponse.json({
+      totalRequests,
+      failedRequests,
+      lastReset,
+      agentUsage,
+    });
+  }
 
   const metrics = [
     "# HELP api_requests_total Total number of API requests",

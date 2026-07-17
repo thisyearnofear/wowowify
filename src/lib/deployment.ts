@@ -35,6 +35,7 @@ export const ASP_ALLOWED_PREFIXES = [
   "/api/provenance",
   "/api/entitlements",
   "/api/image",
+  "/api/metrics",
   "/.well-known/agent.json",
 ] as const;
 

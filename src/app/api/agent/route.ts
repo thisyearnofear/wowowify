@@ -15,6 +15,10 @@ import { getBrandKit, mergeBrandKitIntoCommand } from "@/lib/brand-kits";
 import { getAgentCapabilityCard } from "@/lib/agent-capability-card";
 import { saveCampaignDraft } from "@/lib/campaign-drafts";
 import { checkAgentPayment } from "@/lib/x402";
+import {
+  checkAgentDailyCap,
+  recordAgentCompletion,
+} from "@/lib/agent-usage";
 import type { CampaignKitResponse } from "@/lib/agent-types";
 
 // Mark the route as dynamic to prevent static optimization
@@ -80,6 +84,16 @@ export async function POST(request: Request): Promise<Response> {
     const paymentGate = checkAgentPayment(request);
     if (paymentGate) return paymentGate;
 
+    const dailyCap = await checkAgentDailyCap();
+    if (!dailyCap.allowed) {
+      return NextResponse.json(
+        {
+          error: `Daily generation cap reached (${dailyCap.count}/${dailyCap.max}). Try again tomorrow or contact the operator for a higher limit.`,
+        },
+        { status: 429 },
+      );
+    }
+
     // Ensure fonts are registered before processing
     await ensureFontsAreRegistered();
 
@@ -124,7 +138,7 @@ export async function POST(request: Request): Promise<Response> {
 
     // Always add rate limit headers
     const responseHeaders = {
-      "X-RateLimit-Limit": "20",
+      "X-RateLimit-Limit": String(rateLimitInfo.limit),
       // remaining may be undefined when the rate-limiter has no entry yet;
       // collapse to 0 in that case so the response shape stays a string.
       "X-RateLimit-Remaining": String(rateLimitInfo.remaining ?? 0),
@@ -355,6 +369,9 @@ export async function POST(request: Request): Promise<Response> {
                 result,
               })
             : null;
+        if (result.status === "completed") {
+          await recordAgentCompletion();
+        }
         return NextResponse.json(
           draftMeta ? { ...result, ...draftMeta } : result,
           {
@@ -379,6 +396,10 @@ export async function POST(request: Request): Promise<Response> {
         parsedCommand,
         result,
       });
+
+      if (result.status === "completed") {
+        await recordAgentCompletion();
+      }
 
       return NextResponse.json(draftMeta ? { ...result, ...draftMeta } : result, {
         status: 200,

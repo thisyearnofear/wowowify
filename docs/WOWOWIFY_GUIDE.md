@@ -16,6 +16,8 @@ Bring-your-own-logo: pass `parameters.logoUrl`, upload via `POST /api/upload-log
 
 Wallet / chain interaction is optional (x402, entitlements, provenance) — not required to create artwork.
 
+See **[docs/MONETIZATION.md](./docs/MONETIZATION.md)** for cost guardrails, x402 pricing, and phased monetization after OKX traction.
+
 ## Agent API (primary integration)
 
 Discover the capability card:
