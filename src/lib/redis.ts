@@ -72,6 +72,9 @@ export function getRedisClient(): Redis {
 
       // Parse the Redis URL components
       const { host, port, username, password } = parseRedisUrl(redisUrl);
+      const isLocal = host === "localhost" || host === "127.0.0.1";
+      const useUrlString =
+        redisUrl.startsWith("redis://") || redisUrl.startsWith("rediss://");
 
       // Log connection attempt (without sensitive data)
       logger.info("Attempting Redis connection", {
@@ -79,18 +82,20 @@ export function getRedisClient(): Redis {
         port,
         username,
         passwordLength: password.length,
+        useUrlString,
       });
 
-      // Create Redis client with explicit configuration
-      const isLocal = host === 'localhost' || host === '127.0.0.1';
-      redisClient = new Redis({
-        host,
-        port: parseInt(port, 10),
-        username: isLocal ? undefined : username, // Skip username for local Redis
-        password: isLocal ? undefined : password, // Skip password for local Redis
-        tls: isLocal ? undefined : {}, // Only enable TLS for non-local Redis
-        ...redisOptions,
-      });
+      // Upstash / managed Redis: pass the full URL so ioredis handles rediss:// TLS.
+      redisClient = useUrlString
+        ? new Redis(redisUrl, redisOptions)
+        : new Redis({
+            host,
+            port: parseInt(port, 10),
+            username: isLocal ? undefined : username,
+            password: isLocal ? undefined : password,
+            tls: isLocal ? undefined : {},
+            ...redisOptions,
+          });
 
       // Handle connection events
       redisClient.on("connect", () => {
