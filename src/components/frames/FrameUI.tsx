@@ -63,7 +63,7 @@ export const CampaignAssetsDisplay = ({
               reader.onerror = reject;
               reader.readAsDataURL(blob);
             });
-            return { filename: `toka-${asset.format}.png`, dataUrl };
+            return { filename: `wowowify-${asset.format}.png`, dataUrl };
           }),
         )
       ).filter((entry): entry is { filename: string; dataUrl: string } =>
@@ -72,7 +72,7 @@ export const CampaignAssetsDisplay = ({
 
       if (files.length === 0) return;
       const zip = await buildZipFromDataUrls(files);
-      triggerZipDownload(zip, "toka-campaign.zip");
+      triggerZipDownload(zip, "wowowify-campaign.zip");
     } finally {
       setIsZipping(false);
     }
@@ -106,7 +106,7 @@ export const CampaignAssetsDisplay = ({
           </div>
           <a
             href={url}
-            download={`toka-${asset.format}.png`}
+            download={`wowowify-${asset.format}.png`}
             className="block w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-center text-sm"
           >
             Export {asset.format}
@@ -251,7 +251,7 @@ export const GeneratedImageDisplay = ({
 
         <a
           href={generatedImage}
-          download="toka-artwork.png"
+          download="wowowify-artwork.png"
           className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-md text-center"
         >
           Export

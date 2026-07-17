@@ -6,7 +6,7 @@
   },
   "miniapp": {
     "version": "1",
-    "name": "@toka",
+    "name": "Wowowify",
     "description": "Turn your logo and creative brief into brand-safe social artwork.",
     "iconUrl": "https://wowowify.vercel.app/wowwowowify.png",
     "homeUrl": "https://wowowify.vercel.app/frames",
@@ -16,7 +16,7 @@
     "splashBackgroundColor": "#131313",
     "webhookUrl": "https://wowowify.vercel.app/api/farcaster/webhook",
     "author": {
-      "name": "@toka",
+      "name": "Wowowify",
       "url": "https://wowowify.vercel.app"
     },
     "categories": ["creative", "tools", "media"],
@@ -27,7 +27,7 @@
   },
   "frame": {
     "version": "1",
-    "name": "@toka",
+    "name": "Wowowify",
     "iconUrl": "https://wowowify.vercel.app/wowwowowify.png",
     "homeUrl": "https://wowowify.vercel.app/frames",
     "imageUrl": "https://wowowify.vercel.app/wowwowowify.png",

@@ -86,18 +86,19 @@ describe("getSeedBrandKit", () => {
 
 describe("getAgentCapabilityCard", () => {
   it("exposes discovery and demo brand kit", () => {
-    const card = getAgentCapabilityCard("https://toka.example");
+    const card = getAgentCapabilityCard("https://asp.example");
+    expect(card.schema).toBe("wowowify/agent-capability/v1");
     expect(card.endpoints.discovery).toBe(
-      "https://toka.example/.well-known/agent.json",
+      "https://asp.example/.well-known/agent.json",
     );
-    expect(card.endpoints.service).toBe("https://toka.example/api/agent");
+    expect(card.endpoints.service).toBe("https://asp.example/api/agent");
     expect(card.demo.brandKitId).toBe(DEMO_LAUNCH_KIT_ID);
   });
 });
 
 describe("buildDemoLaunchKit", () => {
   it("ships square, landscape, and portrait defaults", () => {
-    const kit = buildDemoLaunchKit("https://toka.example");
+    const kit = buildDemoLaunchKit("https://wowowify.example");
     expect(kit.id).toBe(DEMO_LAUNCH_KIT_ID);
     expect(kit.formats).toEqual(["square", "landscape", "portrait"]);
     expect(kit.logoUrl).toContain("/demo/launch-mark.png");

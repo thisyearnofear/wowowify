@@ -4,12 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BRAND } from "@/lib/brand";
 
 const NAV_ITEMS = [
-  { href: "/", label: STUDIO_COPY.nav.studio, icon: "🎨" },
-  { href: "/agent", label: STUDIO_COPY.nav.command, icon: "🤖" },
-  { href: "/admin", label: STUDIO_COPY.nav.campaigns, icon: "🖼️" },
-  { href: "/frames", label: STUDIO_COPY.nav.miniApp, icon: "⚡" },
+  { href: "/", label: STUDIO_COPY.nav.studio },
+  { href: "/agent", label: STUDIO_COPY.nav.command },
+  { href: "/admin", label: STUDIO_COPY.nav.campaigns },
 ] as const;
 
 export default function Navigation() {
@@ -60,20 +60,20 @@ export default function Navigation() {
               className="flex items-center gap-2 text-lg font-bold transition-colors"
               style={{ color: "var(--color-wowowify)" }}
             >
-              <span className="text-xl">🎨</span>
-              <span className="hidden sm:inline tracking-tight">@toka</span>
+              <span className="hidden sm:inline tracking-tight">{BRAND.product}</span>
+              <span className="sm:hidden tracking-tight">{BRAND.product.slice(0, 1)}</span>
             </Link>
           </div>
 
           {/* Nav links */}
           <div className="flex items-center gap-1">
-            {NAV_ITEMS.map(({ href, label, icon }) => {
+            {NAV_ITEMS.map(({ href, label }) => {
               const isActive = pathname === href;
               return (
                 <Link
                   key={href}
                   href={href}
-                  className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`relative inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                     isActive
                       ? "text-white"
                       : "hover:bg-black/5 dark:hover:bg-white/10"
@@ -84,8 +84,7 @@ export default function Navigation() {
                       : { color: "var(--color-text-secondary)" }
                   }
                 >
-                  <span className="text-sm">{icon}</span>
-                  <span className="hidden sm:inline">{label}</span>
+                  <span>{label}</span>
                 </Link>
               );
             })}

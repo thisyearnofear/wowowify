@@ -33,7 +33,7 @@ const getNeynarClient = () => {
 
 // Extract command from mention text
 const extractCommand = (text: string): string => {
-  // Remove @toka or any other mention from the text
+  // Remove Farcaster mention tokens from cast text
   return text.replace(/@\w+/g, "").trim();
 };
 
@@ -177,8 +177,8 @@ const replyToCast = async (
       throw new Error("Missing required environment variables");
     }
 
-    // Only add the "@toka what do you see?" line if there's an image
-    const responseText = imageUrl ? `${text}\n\n@toka what do you see?` : text;
+    // Only add the "what do you see?" follow-up when there's an image
+    const responseText = imageUrl ? `${text}\n\nWowowify what do you see?` : text;
 
     const neynarClient = getNeynarClient();
     const publishCastResponse = await neynarClient.publishCast({
@@ -214,7 +214,7 @@ const replyToCast = async (
 const formatErrorMessage = (error: string): string => {
   // Check for specific error patterns
   if (error.includes("Wallet connection required for lensify overlay")) {
-    return "The 'lensify' overlay is not currently available through @toka. Try a brand-safe logo composition instead.";
+    return "The 'lensify' overlay is not currently available through Wowowify. Try a brand-safe logo composition instead.";
   }
 
   // Add more error patterns as needed
@@ -425,7 +425,7 @@ export async function POST(request: Request) {
     if (!commandText) {
       await replyToCast(
         castData.hash,
-        "I didn't understand that command. Try something like '@toka lensify a mountain landscape. scale to 0.3.'"
+        "I didn't understand that command. Try something like 'wowowify a mountain landscape with higherify. scale to 0.3.'"
       );
       return NextResponse.json({ status: "error", reason: "Empty command" });
     }
@@ -441,11 +441,10 @@ export async function POST(request: Request) {
 
       await replyToCast(
         castData.hash,
-        "Hi there! I'm @toka, a bot that can generate and modify images. Try commands like:\n\n" +
-          "• '@toka higherify a mountain landscape'\n" +
-          "• '@toka degenify this image' (when replying to a cast with an image)\n" +
-          "• '@toka scrollify a tech background. scale to 0.5'\n" +
-          "• '@toka ghiblify this image' (transform into Ghibli style)\n\n" +
+        "Hi! I'm Wowowify — brand-safe campaign creative on Persidian. Try the Agent API or Studio, or when Farcaster returns:\n\n" +
+          "• wowowify a mountain landscape with higherify\n" +
+          "• wowowify this image with degenify (reply to a cast with an image)\n" +
+          "• wowowify a tech background with scrollify. scale to 0.5\n\n" +
           "Powered by Venice AI & Grove"
       );
 

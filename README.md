@@ -1,32 +1,32 @@
-# @toka Agentic Brand Studio
+# Wowowify — Persidian Agent
 
-@toka turns an exact logo and a creative brief into publication-ready social artwork. It combines generative imagery with deterministic logo and text composition, preserving brand marks instead of asking an image model to redraw them.
+**Wowowify** turns an exact logo and a creative brief into publication-ready social artwork. AI generates the scene; you **wowowify** your mark onto it — composited exactly, never redrawn.
+
+Part of **[Persidian](https://persidian.com)** — enterprise AI agents for teams.
 
 ## Product Vision
 
-Autonomous agents can write announcements and plan campaigns, but generative image models are unreliable at exact logos, typography, and brand placement. @toka provides the brand-safe production layer between a campaign brief and the finished creative:
+Autonomous agents can write announcements and plan campaigns, but generative image models are unreliable at exact logos, typography, and brand placement. Wowowify is the brand-safe production layer between a campaign brief and finished creative:
 
 1. Generate a visual or start from an existing image.
-2. Apply the original logo without regenerating or distorting it.
+2. Wowowify your original logo without regenerating or distorting it.
 3. Control placement, scale, tint, opacity, and campaign copy.
-4. Return a persistent asset that an agent can publish or hand to a user.
-
-Community presets remain useful shortcuts, but bring-your-own-logo composition is the core direction.
+4. Return a persistent asset that an agent can publish or hand to a human reviewer.
 
 ## Product Strategy
 
-@toka has one creative production system and two equal interfaces:
+One creative engine, two interfaces:
 
-- **Studio for people**: create, inspect, refine, and share campaign artwork in the browser.
-- **Service for agents**: call the same brand-safe composition contract through A2MCP now, with A2A and ACP-compatible commerce added as the service matures.
+- **Studio** (`wowowify.persidian.com`) — humans create, refine, and export.
+- **Agent API** (`api.wowowify.persidian.com`) — agents call the same contract via A2MCP.
 
-An agent should be able to send a collaborator to a prefilled Studio brief for review and refinement. The browser experience is therefore a primary conversion surface, not a demo for the API.
+Agents return `studioReviewUrl` so collaborators approve in Studio. Farcaster distribution is deferred until ASP is live on custom domains.
 
-The product promise is simple: AI creates the visual world; @toka preserves the exact logo, campaign copy, and composition rules.
+The product promise: AI creates the visual world; **Wowowify** preserves the exact logo, campaign copy, and composition rules.
 
 ## Ecosystem & commerce (chain-agnostic)
 
-@toka is **chain-agnostic by design**. Image generation, logo composition, drafts, and human approval in Studio work without a wallet or any chain.
+Wowowify is **chain-agnostic by design**. Generation, composition, drafts, and human approval work without a wallet.
 
 Optional onchain layers are **deployment-specific** — configure env vars per marketplace or partner:
 
@@ -70,17 +70,9 @@ Use `vercel.asp.json` (sets `TOKA_DEPLOYMENT=asp`) for a minimal ASP Vercel proj
 
 **Farcaster SDK note:** `@farcaster/miniapp-sdk@0.3.0` is the current release. Socket currently flags a UUID dependency introduced by its optional Solana/Jayson transitive path. Do not downgrade the SDK, force a cross-major UUID override, or disable Socket; keep the Mini App in the Studio deployment and exclude it from the focused ASP runtime.
 
-## Quick Start Guide for @toka Bot
+## Quick Start
 
-For a concise guide on how to interact with the @toka bot on Farcaster, see [TOKA_GUIDE.md](./docs/TOKA_GUIDE.md). This guide provides:
-
-- Simple command examples for generating images and applying overlays
-- List of all available overlay types
-- Proper syntax for customization options
-- Common mistakes to avoid
-- Troubleshooting tips
-
-This quick reference is especially useful for other bots or agents that want to interact with @toka.
+See **[docs/WOWOWIFY_GUIDE.md](./docs/WOWOWIFY_GUIDE.md)** for Agent API examples, OKX ASP registration URLs, and deployment notes.
 
 ## Agent Integration
 
@@ -111,7 +103,7 @@ curl -X POST https://your-app.com/api/agent \
   }'
 ```
 
-When `formats` is supplied, @toka generates the visual world once, then returns an `assets` array with deterministic crops and logo/text composition for each requested format.
+When `formats` is supplied, Wowowify generates the visual world once, then returns an `assets` array with deterministic crops and logo/text composition for each requested format.
 
 The agent understands commands like:
 
@@ -510,17 +502,17 @@ When deploying to Vercel or other serverless environments, keep these important 
 - **Production**: Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set
 - **Farcaster bot**: optional Grove uploads for persistent cast reply links (see [docs/archive/LEGACY_WEB3.md](./docs/archive/LEGACY_WEB3.md) for historical Web3/NFT integration notes)
 
-## Farcaster Integration
+## Farcaster Integration (deferred)
 
-The @toka bot processes natural-language commands when mentioned in a cast. See [TOKA_GUIDE.md](./docs/TOKA_GUIDE.md) for syntax, presets, and troubleshooting.
+Farcaster bot and Mini App distribution are **deferred** until Wowowify ASP is live on custom domains (`api.wowowify.persidian.com`). The Studio still ships `/frames` and webhook routes for a future relaunch.
 
-The **Mini App** at `/frames` lets Farcaster users write a campaign brief and generate artwork without leaving the client. Wallet connection is not required to create artwork.
+When re-enabled:
 
-### Bot setup (summary)
+- Bot webhook: `cast.created` → `/api/farcaster/webhook`
+- Mini App: `/frames` (campaign brief + export without leaving Warpcast)
+- Setup: Neynar API key, signer UUID, webhook secret — see [WOWOWIFY_GUIDE.md](./docs/WOWOWIFY_GUIDE.md)
 
-1. Neynar API key + bot signer UUID + webhook secret
-2. Webhook: `cast.created` → `https://your-app-url.com/api/farcaster/webhook`
-3. Allowlist via `/api/farcaster/allowed-users` during testing
+Natural-language commands use the **wowowify** verb (e.g. "wowowify a mountain landscape with higherify") instead of a Farcaster handle mention.
 
 ## Ghibli Style Integration
 
@@ -537,21 +529,23 @@ The application now includes a Ghibli-style transformation feature powered by th
 
 You can use the ghiblify feature in several ways:
 
-1. **Through the Farcaster Bot**:
+1. **Through the Agent API or Studio** — use `overlayMode: "ghiblify"` in `POST /api/agent`, or pick the ghiblify preset in Studio.
+
+2. **Through Farcaster (when relaunched)**:
 
    ```
-   @toka ghiblify this image
+   wowowify this image with ghiblify
    ```
 
    When replying to a cast with an image, or:
 
    ```
-   @toka ghiblify a mountain landscape
+   wowowify a mountain landscape with ghiblify
    ```
 
    To generate and transform a new image
 
-2. **Through the API**:
+3. **Through the API**:
    ```json
    {
      "command": "ghiblify this image",

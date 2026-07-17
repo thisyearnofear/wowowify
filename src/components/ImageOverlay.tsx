@@ -634,21 +634,21 @@ export default function ImageOverlay() {
     try {
       const img = await loadImageElement(sourceUrl);
       if (exportFormats.length === 0) {
-        triggerDownload(sourceUrl, "toka-artwork.png");
+        triggerDownload(sourceUrl, "wowowify-artwork.png");
         return;
       }
 
       const files = exportFormats.map((format) => {
         const canvas = cropCanvasToFormat(img, img.width, img.height, format);
         return {
-          filename: `toka-${format}.png`,
+          filename: `wowowify-${format}.png`,
           dataUrl: canvas.toDataURL("image/png"),
         };
       });
 
       if (files.length > 1) {
         const zip = await buildZipFromDataUrls(files);
-        triggerZipDownload(zip, "toka-campaign.zip");
+        triggerZipDownload(zip, "wowowify-campaign.zip");
         return;
       }
 

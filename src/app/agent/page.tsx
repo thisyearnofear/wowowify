@@ -11,6 +11,7 @@ import type { BrandKit } from "@/lib/brand-kits";
 import { buildStudioUrl } from "@/lib/studio-url";
 import { uploadLogoFile } from "@/lib/upload-logo-client";
 import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BRAND } from "@/lib/brand";
 import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
 import { FormatSelector } from "@/components/studio/FormatSelector";
 import { BuilderStrip } from "@/components/studio/BuilderStrip";
@@ -300,7 +301,7 @@ function AgentContent() {
       <div className="text-center mb-6">
         <Image
           src="/wowwowowify.png"
-          alt="@toka"
+          alt={BRAND.product}
           width={200}
           height={200}
           className="w-24 h-auto mx-auto mb-3"
@@ -530,7 +531,7 @@ function AgentContent() {
                     </div>
                     <a
                       href={url}
-                      download={`toka-${asset.format}.png`}
+                      download={`wowowify-${asset.format}.png`}
                       className="text-xs underline"
                     >
                       Export {asset.format}

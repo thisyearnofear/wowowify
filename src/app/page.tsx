@@ -7,6 +7,7 @@ import Navigation from "@/components/Navigation";
 import { Suspense } from "react";
 import { LoadingText } from "@/components/LoadingText";
 import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BRAND } from "@/lib/brand";
 import { StudioHero } from "@/components/studio/StudioHero";
 
 export default function Home() {
@@ -18,7 +19,7 @@ export default function Home() {
           <div className="flex flex-col items-center gap-3 mb-2 animate-fadeInUp text-center">
             <Image
               src="/wowwowowify.png"
-              alt="@toka"
+              alt={BRAND.product}
               width={200}
               height={200}
               className="w-28 sm:w-32 h-auto drop-shadow-lg"

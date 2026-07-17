@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { createMiniAppMetaTags, MINIAPP_CONFIG } from "@/lib/miniapp";
 import { APP_URL, APP_ICON_URL } from "@/lib/env";
+import { BRAND } from "@/lib/brand";
 import ClientRoot from "@/components/providers/ClientRoot";
 
 const geistSans = Geist({
@@ -17,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   ...createMiniAppMetaTags(
-    `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+    `${BRAND.product} on ${BRAND.portfolio}`,
     MINIAPP_CONFIG.description,
     `${APP_URL}/previews/frame-preview.png`,
     "🎨 Generate Image",

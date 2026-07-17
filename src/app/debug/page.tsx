@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Navigation from "@/components/Navigation";
 import Image from "next/image";
+import { BRAND } from "@/lib/brand";
 
 interface DebugInfo {
   environment: string;
@@ -78,7 +79,7 @@ export default function DebugPage() {
       <div className="flex justify-center mb-6">
         <Image
           src="/wowwowowify.png"
-          alt="@toka"
+          alt={BRAND.product}
           width={200}
           height={200}
           className="w-32 h-auto"

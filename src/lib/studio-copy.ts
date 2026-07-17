@@ -1,51 +1,49 @@
+import { BRAND } from "@/lib/brand";
+
 /** Canonical user-facing Studio vocabulary — single source of truth. */
 export const STUDIO_COPY = {
-  name: "@toka Studio",
-  /** One-line problem → outcome (PG-style clarity). */
-  headline: "AI art that keeps your logo exact.",
-  tagline:
-    "Generate the scene. We composite your real mark and copy — never redrawn, never hallucinated.",
-  /** Who it's for — reduces “what is this?” friction. */
-  audience:
-    "For founders, community leads, and agent builders shipping launch creative.",
+  name: BRAND.product,
+  headline: BRAND.headline,
+  tagline: BRAND.tagline,
+  audience: BRAND.audience,
+  portfolioLine: `Part of ${BRAND.portfolio}`,
   steps: {
     brief: "Brief",
-    brand: "Brand",
+    brand: "Wowowify",
     refine: "Refine",
     export: "Export",
   },
-  /** Three equal entry paths — distribution built into the product (Thiel-style). */
   paths: {
-    title: "Three ways in",
+    title: "Two ways in",
     studio: {
       label: "Studio",
-      hint: "You have a logo and a brief — refine and export here.",
-      cta: "Start in Studio",
+      hint: "Upload a brief and logo — wowowify, refine, and export.",
+      cta: "Open Studio",
     },
     agent: {
       label: "Agent API",
-      hint: "Your bot calls the same pipeline — hands humans a review link.",
-      cta: "Try Command",
+      hint: "Your agent calls the same pipeline — hands humans a review link.",
+      cta: "Open Command",
     },
     farcaster: {
       label: "Farcaster",
-      hint: "Mention @toka or open the Mini App from a cast.",
-      cta: "Open Mini App",
+      hint: "Social distribution — coming after ASP launch on Persidian.",
+      cta: "Coming soon",
     },
   },
   draft: {
     bannerTitle: "Review draft from your agent",
     bannerBody:
-      "An agent created this campaign for your approval. Adjust copy and placement, then export or share the Studio link.",
+      "An agent wowowified this campaign for your approval. Adjust copy and placement, then export or share the Studio link.",
   },
   brief: {
     uploadVisual: "Upload visual",
     writeBrief: "Write brief",
     placeholder: "Describe your campaign brief…",
-    hint: "Start with a photo or describe the scene — you'll add your exact logo next.",
+    hint: "Start with a photo or describe the scene — you'll wowowify your exact logo next.",
   },
   brand: {
-    title: "Brand mark",
+    title: "Wowowify your mark",
     uploadLogo: "Upload your logo",
     logoHint: "Your exact logo is composited — never redrawn by AI.",
     communityStarters: "Community starters",
@@ -61,6 +59,7 @@ export const STUDIO_COPY = {
     action: "Export",
     saving: "Exporting…",
     shareHint: "Share the Studio URL so teammates can refine this draft.",
+    successHint: "Wowowified — your logo was composited, not redrawn.",
   },
   brandKit: {
     load: "Load brand kit",
@@ -74,14 +73,13 @@ export const STUDIO_COPY = {
     studio: "Studio",
     command: "Command",
     campaigns: "Campaigns",
-    miniApp: "Mini App",
+    miniApp: "Farcaster",
   },
   command: {
     title: "Command",
-    subtitle:
-      "Same brand-safe pipeline as Studio — built for agents and technical users.",
+    subtitle: `Same brand-safe pipeline as ${BRAND.product} Studio — built for agents and technical users.`,
     preview: "Preview command",
-    create: "Create artwork",
+    create: "Wowowify artwork",
     openStudio: "Open in Studio",
     resultTitle: "Campaign ready",
     shareReview: "Copy review link",
@@ -94,18 +92,18 @@ export const STUDIO_COPY = {
     discovery: "Agent discovery",
     service: "Service endpoint",
     register: "Register on OKX ASP",
-    registerHint: "List @toka as A2MCP — discovery + POST /api/agent.",
+    registerHint: `List ${BRAND.product} as A2MCP on Persidian — discovery + POST /api/agent.`,
     docs: "Deployment docs",
   },
   footer: {
-    tagline: "Brand-safe creative layer for agents and teams.",
+    tagline: `${BRAND.product} — brand-safe creative on ${BRAND.portfolio}.`,
   },
   admin: {
     title: "Recent campaigns",
-    subtitle: "Latest composed artwork from Studio and agents.",
+    subtitle: "Latest wowowified artwork from Studio and agents.",
     signIn: "Sign in to view campaigns",
   },
 } as const;
 
 /** Default public ASP host — used when NEXT_PUBLIC_ASP_URL is unset. */
-export const DEFAULT_ASP_PUBLIC_URL = "https://wowowify-asp.vercel.app";
+export const DEFAULT_ASP_PUBLIC_URL = BRAND.vercel.asp;

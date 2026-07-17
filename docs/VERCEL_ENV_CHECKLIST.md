@@ -59,7 +59,9 @@ curl -sI "https://wowowify.vercel.app/api/image?id=smoke-test-$RANDOM"
 
 **Expected**: Agent POST returns `completed` with `*.public.blob.vercel-storage.com` URLs. Image route 404 for unknown id is healthy; 500 means Blob env is misconfigured (often private store + `access: "public"`).
 
-### 2.2 · Webhook signature enforcement
+### 2.2 · Webhook signature enforcement (Farcaster — deferred)
+
+Routes remain deployed; skip live bot smoke tests until Farcaster relaunch.
 
 ```bash
 # Valid path: missing signature → 401
@@ -67,16 +69,11 @@ curl -sI -X POST "https://wowowify.vercel.app/api/farcaster/webhook" \
   -H "Content-Type: application/json" -d '{}'
 ```
 
-**Expected**: 401 (signature required in production per `verifyWebhookSignature()` in the route). 200 means the signature check is gated off — investigate before launch.
+**Expected**: 401 (signature required in production per `verifyWebhookSignature()` in the route). 200 means the signature check is gated off — investigate before Farcaster relaunch.
 
-### 2.3 · Webhook happy-path (manual end-to-end)
+### 2.3 · Farcaster bot happy-path (skip until relaunch)
 
-In a Warpcast client connected to the @toka bot, post a cast mentioning `@toka lensify a mountain landscape` and confirm:
-- Bot replies with "Processing..." within ~3 seconds
-- Image arrives within ~30 seconds
-- Image is correctly overlay-stamped
-
-**Expected**: full flow. Any 500 between steps means a route failed — check `/_logs` (admin pages exist) or Vercel function logs.
+When the bot is live again, post a cast with a wowowify command (e.g. `wowowify a mountain landscape with higherify`) and confirm reply + image delivery. Defer this until ASP is on `api.wowowify.persidian.com`.
 
 ### 2.4 · Rate-limit wiring
 

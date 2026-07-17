@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
 import { APP_URL } from "@/lib/env";
 import { MINIAPP_CONFIG } from "@/lib/miniapp";
+import { BRAND } from "@/lib/brand";
 
 const appUrl = APP_URL;
+const product = BRAND.product;
 
-// Mini App Embed configuration
+// Mini App Embed configuration (Farcaster relaunch deferred)
 const miniAppEmbed = {
   version: "1",
   imageUrl: `${appUrl}/previews/frame-preview.png`,
   button: {
-    title: "@toka",
+    title: product,
     action: {
       type: "launch_frame",
-      name: "@toka",
+      name: product,
       url: `${appUrl}/frames`,
       splashImageUrl: `${appUrl}/wowwowowify.png`,
       splashBackgroundColor: "#131313",
@@ -20,15 +22,14 @@ const miniAppEmbed = {
   },
 };
 
-// Legacy frame configuration for backward compatibility
 const frameConfig = {
   version: "next",
   imageUrl: `${appUrl}/previews/frame-preview.png`,
   button: {
-    title: "@toka",
+    title: product,
     action: {
       type: "launch_frame",
-      name: "@toka",
+      name: product,
       url: `${appUrl}/frames`,
       splashImageUrl: `${appUrl}/wowwowowify.png`,
       splashBackgroundColor: "#131313",
@@ -37,35 +38,32 @@ const frameConfig = {
 };
 
 export const metadata: Metadata = {
-  title: `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+  title: `${product} on ${BRAND.portfolio}`,
   description: MINIAPP_CONFIG.description,
   openGraph: {
-    title: `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+    title: `${product} on ${BRAND.portfolio}`,
     description: MINIAPP_CONFIG.description,
     images: [
       {
         url: `${appUrl}/previews/frame-preview.png`,
         width: 1200,
         height: 630,
-        alt: "@toka Mini App Preview",
+        alt: `${product} Mini App Preview`,
       },
     ],
-    siteName: "@toka",
+    siteName: product,
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${MINIAPP_CONFIG.name} — Agentic Brand Studio`,
+    title: `${product} on ${BRAND.portfolio}`,
     description: MINIAPP_CONFIG.description,
     images: [`${appUrl}/previews/frame-preview.png`],
   },
   other: {
-    // Primary Mini App embed tag
     "fc:miniapp": JSON.stringify(miniAppEmbed),
-    // Legacy frame tag for backward compatibility
     "fc:frame": JSON.stringify(frameConfig),
-    // Additional Mini App metadata
-    "fc:miniapp:name": "@toka",
+    "fc:miniapp:name": product,
     "fc:miniapp:description": MINIAPP_CONFIG.description,
     "fc:miniapp:icon": `${appUrl}/wowwowowify.png`,
     "fc:miniapp:splash": `${appUrl}/wowwowowify.png`,

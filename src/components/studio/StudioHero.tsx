@@ -3,21 +3,14 @@
 import Link from "next/link";
 import { STUDIO_COPY } from "@/lib/studio-copy";
 
-const PATHS = [
+const ACTIVE_PATHS = [
   {
     href: "/",
     ...STUDIO_COPY.paths.studio,
-    icon: "🎨",
   },
   {
     href: "/agent",
     ...STUDIO_COPY.paths.agent,
-    icon: "🤖",
-  },
-  {
-    href: "/frames",
-    ...STUDIO_COPY.paths.farcaster,
-    icon: "⚡",
   },
 ] as const;
 
@@ -28,7 +21,7 @@ export function StudioHero() {
         className="text-xs font-semibold uppercase tracking-wider"
         style={{ color: "var(--color-wowowify)" }}
       >
-        Agentic Brand Studio
+        {STUDIO_COPY.portfolioLine}
       </p>
       <h2
         className="text-lg sm:text-xl font-bold tracking-tight leading-snug"
@@ -56,20 +49,17 @@ export function StudioHero() {
         >
           {STUDIO_COPY.paths.title}
         </p>
-        <div className="grid sm:grid-cols-3 gap-3 text-left">
-          {PATHS.map(({ href, label, hint, cta, icon }) => (
+        <div className="grid sm:grid-cols-2 gap-3 text-left max-w-xl mx-auto">
+          {ACTIVE_PATHS.map(({ href, label, hint, cta }) => (
             <Link
               key={href}
               href={href}
               className="surface rounded-xl p-3 border transition-shadow hover:shadow-md block"
             >
-              <div className="flex items-center gap-2 mb-1">
-                <span aria-hidden>{icon}</span>
-                <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
-                  {label}
-                </span>
-              </div>
-              <p className="text-xs mb-2" style={{ color: "var(--color-text-secondary)" }}>
+              <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                {label}
+              </span>
+              <p className="text-xs mt-1 mb-2" style={{ color: "var(--color-text-secondary)" }}>
                 {hint}
               </p>
               <span
@@ -81,6 +71,12 @@ export function StudioHero() {
             </Link>
           ))}
         </div>
+        <p
+          className="text-xs mt-3 opacity-70"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
+          {STUDIO_COPY.paths.farcaster.label}: {STUDIO_COPY.paths.farcaster.hint}
+        </p>
       </div>
     </section>
   );

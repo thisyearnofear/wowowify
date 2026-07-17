@@ -151,7 +151,7 @@ export async function POST(request: Request): Promise<Response> {
 
     await replyToCast(
       pending.castHash,
-      "Here's your Ghibli-style image! ✨\n\n@toka what do you see?\n\npowered by Venice AI & Grove",
+      "Here's your Ghibli-style image! ✨\n\nWowowify what do you see?\n\npowered by Venice AI & Grove",
       imageUrl,
     );
 

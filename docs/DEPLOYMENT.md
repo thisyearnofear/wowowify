@@ -2,10 +2,10 @@
 
 Production runs as **two Vercel projects** from the same Git repo:
 
-| Project | URL | `TOKA_DEPLOYMENT` | Role |
-|---|---|---|---|
-| `wowowify` | https://wowowify.vercel.app | `studio` or `all` | Browser Studio, Mini App, admin |
-| `wowowify-asp` | https://wowowify-asp.vercel.app | `asp` | API-only agent service |
+| Project | URL (current) | Target custom domain | `TOKA_DEPLOYMENT` | Role |
+|---|---|---|---|---|
+| `wowowify` | https://wowowify.vercel.app | https://wowowify.persidian.com | `studio` or `all` | Browser Studio, Mini App, admin |
+| `wowowify-asp` | https://wowowify-asp.vercel.app | https://api.wowowify.persidian.com | `asp` | API-only agent service |
 
 Use `vercel.asp.json` (sets `TOKA_DEPLOYMENT=asp`) as the **Root Directory / override** config for the ASP project in Vercel project settings, or maintain a duplicate project linked to the same repo with that file applied.
 
@@ -65,8 +65,8 @@ Private stores + `access: "public"` fail with a Blob write error — migrate to 
 | Variable | Studio | ASP | Notes |
 |---|---|---|---|
 | `TOKA_DEPLOYMENT` | `studio` / `all` | `asp` | Gates middleware + routes |
-| `STUDIO_URL` | `https://wowowify.vercel.app` | same | Demo kit static assets, review links |
-| `ASP_URL` | `https://wowowify-asp.vercel.app` | same | agent.json service URL |
+| `STUDIO_URL` | `https://wowowify.persidian.com` (or Vercel fallback) | same | Demo kit static assets, review links |
+| `ASP_URL` | `https://api.wowowify.persidian.com` (or Vercel fallback) | same | agent.json service URL |
 | `NEXT_PUBLIC_APP_URL` | Studio URL | Studio URL | OG tags, client fallbacks |
 | `NEXT_PUBLIC_ASP_URL` | ASP URL | optional | Builder strip copy links |
 | `BLOB_READ_WRITE_TOKEN` | shared store token | shared store token | From linked `toka-blob` |
@@ -80,11 +80,13 @@ See also [VERCEL_ENV_CHECKLIST.md](./VERCEL_ENV_CHECKLIST.md) for smoke tests.
 
 ## Discovery URLs (OKX / ASP registration)
 
-| Purpose | URL |
-|---|---|
-| Agent capability card | `https://wowowify-asp.vercel.app/.well-known/agent.json` |
-| Service endpoint | `https://wowowify-asp.vercel.app/api/agent` |
-| Human review | `https://wowowify.vercel.app/?draftId={id}` |
+| Purpose | Target (after DNS) | Vercel fallback (until DNS) |
+|---|---|---|
+| Agent capability card | `https://api.wowowify.persidian.com/.well-known/agent.json` | `https://wowowify-asp.vercel.app/.well-known/agent.json` |
+| Service endpoint | `https://api.wowowify.persidian.com/api/agent` | `https://wowowify-asp.vercel.app/api/agent` |
+| Human review | `https://wowowify.persidian.com/?draftId={id}` | `https://wowowify.vercel.app/?draftId={id}` |
+
+Register OKX ASP with the **target** URLs once DNS and env vars are wired. Use Vercel fallbacks for smoke tests before cutover.
 
 ---
 

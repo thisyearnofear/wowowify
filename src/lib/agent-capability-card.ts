@@ -6,6 +6,7 @@ import {
   getX402Network,
 } from "@/lib/commerce-config";
 import { ASP_URL, STUDIO_URL } from "@/lib/deployment";
+import { BRAND } from "@/lib/brand";
 
 /** Public ASP / A2MCP capability card — shared by GET /api/agent and /.well-known/agent.json */
 export function getAgentCapabilityCard(
@@ -13,12 +14,13 @@ export function getAgentCapabilityCard(
   studioUrl: string = STUDIO_URL,
 ) {
   return {
-    schema: "toka/agent-capability/v1",
-    name: "@toka Agentic Brand Studio",
-    version: "1.2.0",
+    schema: "wowowify/agent-capability/v1",
+    name: `${BRAND.product} — brand-safe campaign creative`,
+    version: "1.3.0",
     description:
-      "Creates publication-ready, brand-safe creative from a campaign brief and an exact logo.",
+      "Persidian agent that creates publication-ready creative from a campaign brief and an exact logo. AI generates the scene; Wowowify composes your mark.",
     protocol: "A2MCP",
+    portfolio: BRAND.portfolio,
     deployment: {
       aspUrl,
       studioUrl,
@@ -94,8 +96,9 @@ export function getAgentCapabilityCard(
       },
     },
     documentation: {
-      botGuide: "docs/TOKA_GUIDE.md",
+      guide: "docs/WOWOWIFY_GUIDE.md",
       studio: studioUrl,
+      portfolio: BRAND.urls.portfolio,
     },
   } as const;
 }

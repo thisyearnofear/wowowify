@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DEFAULT_ASP_PUBLIC_URL, STUDIO_COPY } from "@/lib/studio-copy";
+import { BRAND } from "@/lib/brand";
 
 export default function Footer() {
   const aspOrigin =
@@ -31,6 +32,14 @@ export default function Footer() {
             agent.json
           </a>
           <a
+            href={BRAND.urls.portfolio}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-80"
+          >
+            {BRAND.portfolio}
+          </a>
+          <a
             href="https://www.okx.ai/tutorial/asp"
             target="_blank"
             rel="noopener noreferrer"
@@ -38,28 +47,20 @@ export default function Footer() {
           >
             OKX ASP
           </a>
-          <a
-            href="https://github.com/thisyearnofear/wowowify/blob/master/docs/DEPLOYMENT.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:opacity-80"
-          >
-            Deploy docs
-          </a>
         </div>
         <div
           className="flex items-center justify-between text-xs pt-1 border-t"
           style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
         >
-          <span className="opacity-60">built with ✨ by</span>
+          <span className="opacity-60">{STUDIO_COPY.portfolioLine}</span>
           <a
-            href="https://hey.xyz/u/papajams"
+            href={BRAND.urls.portfolio}
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium transition-colors hover:opacity-80"
             style={{ color: "var(--color-wowowify)" }}
           >
-            papa
+            {BRAND.portfolio}
           </a>
         </div>
       </div>

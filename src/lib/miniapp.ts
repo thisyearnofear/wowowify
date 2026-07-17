@@ -5,12 +5,12 @@
 import { sdk } from "@farcaster/miniapp-sdk";
 import { APP_URL, APP_ICON_URL } from "./env";
 import { logger } from "./logger";
+import { BRAND } from "./brand";
 
-// Mini App configuration constants
+// Mini App configuration constants (Farcaster integration deferred until ASP is live)
 export const MINIAPP_CONFIG = {
-  name: "@toka",
-  description:
-    "Turn your logo and creative brief into brand-safe social artwork",
+  name: BRAND.product,
+  description: BRAND.tagline,
   version: "1",
   categories: ["creative", "tools", "media"],
   tags: ["brand", "logo", "image", "creative", "social", "art"],

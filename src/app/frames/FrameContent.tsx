@@ -5,6 +5,7 @@ import type { CampaignFormat } from "@/lib/agent-types";
 import type { BrandKit } from "@/lib/brand-kits";
 import { buildStudioUrl } from "@/lib/studio-url";
 import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BRAND } from "@/lib/brand";
 import { FarcasterContext } from "@/types/farcaster";
 import {
   BrandCampaignFields,
@@ -253,13 +254,13 @@ export default function FrameContent() {
     window.open(studioUrl, "_blank");
   }, [studioUrl]);
 
-  if (!isSDKLoaded) return <div className="p-4 text-center">Loading @toka...</div>;
+  if (!isSDKLoaded) return <div className="p-4 text-center">Loading {BRAND.product}…</div>;
 
   const hasResult = Boolean(generatedImage || generatedAssets.length);
 
   return (
     <div className="w-[320px] mx-auto py-4 px-2 bg-gray-900 text-white rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold text-center mb-1">@toka</h1>
+      <h1 className="text-2xl font-bold text-center mb-1">{BRAND.product}</h1>
       <p className="text-xs text-center text-gray-400 mb-4">{STUDIO_COPY.tagline}</p>
       {contextData?.user && <UserWelcome user={contextData.user} />}
 

@@ -13,9 +13,13 @@ Single source of truth for how humans and AI agents collaborate on this codebase
 7. **PERFORMANT** — Vercel cold starts matter; prefer fire-and-return over polling.
 8. **ORGANIZED** — domain-driven directory layout (commands, services, components, providers, ui).
 
-## Bot name
+## Bot / product name
 
-**`@toka`** is the canonical name across the UI, webhook help text, Frame API embed, scripts/intro casts, and user-facing docs. Do not use "Snel" anywhere new — historical references in `docs/`, code comments, and `README.md` quickstart should remain `@toka`.
+**Wowowify** is the canonical product name across UI, agent capability cards, docs, and OKX ASP listings. It is a **Persidian** agent (`wowowify.persidian.com`).
+
+**wowowify** (lowercase) is the compositing verb — “wowowify your logo onto this scene.”
+
+Farcaster bot integration is deferred; do not introduce `@toka` in new user-facing copy. Historical `@toka` references in archived docs may remain until removed.
 
 ## Pre-commit hooks (active)
 

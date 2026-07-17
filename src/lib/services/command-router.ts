@@ -1,6 +1,6 @@
 /**
  * CommandRouter — orchestrator class that owns parse → acquire → compose →
- * archive for the @toka image pipeline.
+ * archive for the Wowowify image pipeline.
  *
  * Decomposed from src/lib/services/image-service.ts (876 LOC) into:
  *   - text-renderer.ts        (text rasterization)

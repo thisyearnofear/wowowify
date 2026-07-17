@@ -5,6 +5,7 @@ import Navigation from "@/components/Navigation";
 import Image from "next/image";
 import { ImageRecord } from "@/lib/metrics";
 import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BRAND } from "@/lib/brand";
 
 function AdminContent() {
   // --- Auth state (must be declared before any conditional return) ---
@@ -105,7 +106,7 @@ function AdminContent() {
         <div className="flex justify-center mb-4">
           <Image
             src="/wowwowowify.png"
-            alt="@toka"
+            alt={BRAND.product}
             width={200}
             height={200}
             className="w-32 h-auto"
@@ -149,7 +150,7 @@ function AdminContent() {
       <div className="flex justify-center mb-6">
         <Image
           src="/wowwowowify.png"
-          alt="@toka"
+          alt={BRAND.product}
           width={200}
           height={200}
           className="w-32 h-auto"
