@@ -16,6 +16,12 @@ export const InitialStage = ({
 }: InitialStageProps) => {
   return (
     <div className="flex flex-col items-center gap-4">
+      <p
+        className="text-xs text-center max-w-md"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
+        {STUDIO_COPY.brief.hint}
+      </p>
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <label
           className="w-full sm:w-auto px-6 py-3 surface rounded-full cursor-pointer font-semibold text-sm text-center transition-all hover:shadow-md"

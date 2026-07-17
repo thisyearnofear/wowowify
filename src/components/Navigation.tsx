@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import { STUDIO_COPY } from "@/lib/studio-copy";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Studio", icon: "🎨" },
-  { href: "/agent", label: "Command", icon: "🤖" },
-  { href: "/admin", label: "History", icon: "🖼️" },
-  { href: "/frames", label: "Mini App", icon: "⚡" },
+  { href: "/", label: STUDIO_COPY.nav.studio, icon: "🎨" },
+  { href: "/agent", label: STUDIO_COPY.nav.command, icon: "🤖" },
+  { href: "/admin", label: STUDIO_COPY.nav.campaigns, icon: "🖼️" },
+  { href: "/frames", label: STUDIO_COPY.nav.miniApp, icon: "⚡" },
 ] as const;
 
 export default function Navigation() {

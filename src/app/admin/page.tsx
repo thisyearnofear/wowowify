@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Navigation from "@/components/Navigation";
 import Image from "next/image";
 import { ImageRecord } from "@/lib/metrics";
+import { STUDIO_COPY } from "@/lib/studio-copy";
 
 function AdminContent() {
   // --- Auth state (must be declared before any conditional return) ---
@@ -113,9 +114,9 @@ function AdminContent() {
         </div>
         <div className="max-w-sm mx-auto mt-8">
           <form onSubmit={handleLogin} className="space-y-4">
-            <h2 className="text-xl font-bold text-center">History</h2>
+            <h2 className="text-xl font-bold text-center">{STUDIO_COPY.admin.title}</h2>
             <p className="text-sm text-center text-gray-500">
-              Admin access to recent campaign artwork
+              {STUDIO_COPY.admin.subtitle}
             </p>
             <input
               type="password"
@@ -157,7 +158,7 @@ function AdminContent() {
       </div>
 
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-center mb-4">Recent campaigns</h2>
+        <h2 className="text-xl font-bold text-center mb-4">{STUDIO_COPY.admin.title}</h2>
 
         {isInitialLoad || loading ? (
           <div className="flex justify-center p-4">

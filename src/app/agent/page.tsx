@@ -13,6 +13,7 @@ import { uploadLogoFile } from "@/lib/upload-logo-client";
 import { STUDIO_COPY } from "@/lib/studio-copy";
 import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
 import { FormatSelector } from "@/components/studio/FormatSelector";
+import { BuilderStrip } from "@/components/studio/BuilderStrip";
 
 const LoadingIndicator = () => (
   <div className="flex flex-col items-center justify-center py-4">
@@ -506,24 +507,9 @@ function AgentContent() {
       )}
 
       {result && (
-        <div className="p-4 mb-8 surface rounded-lg border">
-          <h2 className="text-lg font-semibold mb-4 text-center">Result</h2>
-          {result.status === "completed" && result.draftId && (
-            <div className="mb-4 p-3 rounded-lg border text-sm space-y-2">
-              <p>
-                <strong>Draft ID:</strong>{" "}
-                <code className="text-xs break-all">{result.draftId}</code>
-              </p>
-              {result.studioReviewUrl && (
-                <Link
-                  href={result.studioReviewUrl}
-                  className="inline-block px-4 py-2 text-white rounded-lg"
-                  style={{ backgroundColor: "var(--color-wowowify)" }}
-                >
-                  Open in Studio for approval
-                </Link>
-              )}
-            </div>
+        <div className="p-4 mb-8 surface rounded-lg border space-y-4">
+          {result.status === "completed" && result.studioReviewUrl && (
+            <BuilderStrip reviewUrl={result.studioReviewUrl} />
           )}
           {result.status === "completed" && result.assets && result.assets.length > 0 && (
             <div className="grid sm:grid-cols-3 gap-3 mb-4">
@@ -586,21 +572,16 @@ function AgentContent() {
         </div>
       )}
 
+      <BuilderStrip />
+
       <div className="mb-8 p-4 surface rounded-lg border text-sm space-y-3">
-        <h2 className="text-base font-semibold">Examples</h2>
+        <h2 className="text-base font-semibold">Example brief</h2>
         <p style={{ color: "var(--color-text-secondary)" }}>
-          <strong>Brand campaign:</strong>{" "}
           <span className="font-mono text-xs">
-            Generate a product launch visual. Scale to 0.5. --text &quot;SHIPS TODAY&quot;
-          </span>
-        </p>
-        <p style={{ color: "var(--color-text-secondary)" }}>
-          <strong>With logo URL:</strong> add a public logo URL above, or use{" "}
-          <span className="font-mono text-xs">POST /api/agent</span> with{" "}
-          <span className="font-mono text-xs">parameters.logoUrl</span>.
-        </p>
-        <p style={{ color: "var(--color-text-secondary)" }}>
-          See <code className="text-xs">docs/TOKA_GUIDE.md</code> in the repo for Farcaster bot syntax and community preset names.
+            Soft blue gradient launch background with bold lighting
+          </span>{" "}
+          — use brand kit <span className="font-mono text-xs">demo-launch</span> or
+          upload your logo above.
         </p>
       </div>
     </div>

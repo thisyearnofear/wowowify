@@ -1,26 +1,42 @@
 # Vercel Env-Verification Checklist
 
-**Run before flipping DNS / announcing the soft launch.** Each env var below is a known fixed dependency of a route in `src/app/api/`. Production fails LOUD if any required env is missing (see `src/lib/image-store.ts` for the loud-fail pattern), so a missing env surfaces as a 500 with a clear error message — not silent data loss.
+**Run before flipping DNS / announcing the soft launch.** See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the Studio + ASP split, shared `toka-blob` store, and **git-only deploy rule for ASP** (do not use CLI `vercel redeploy` on `wowowify-asp`).
+
+Each env var below is a known fixed dependency of a route in `src/app/api/`. Production fails LOUD if any required env is missing (see `src/lib/image-store.ts` for the loud-fail pattern), so a missing env surfaces as a 500 with a clear error message — not silent data loss.
 
 ---
 
-## 1 · Confirm all 7 env vars are present in Vercel
+## 0 · Two Vercel projects
 
-Vercel dashboard → Project → Settings → Environment Variables. For each var below, verify:
+| Project | Role | `TOKA_DEPLOYMENT` |
+|---|---|---|
+| `wowowify` | Studio + Mini App | `studio` or `all` |
+| `wowowify-asp` | API-only ASP | `asp` |
+
+Both projects should share **`toka-blob`** (public) — same `BLOB_READ_WRITE_TOKEN` + `BLOB_STORE_ID`. Legacy private `wowowify-blob` must not receive new writes.
+
+---
+
+## 1 · Confirm env vars are present in Vercel
+
+Vercel dashboard → Project → Settings → Environment Variables. For each var below, verify on **both** projects where marked:
 - **Value** matches what the corresponding service expects
 - **Scope** is `Production` (testnet is fine for soft launch)
 - **Sensitive values** are NOT visible to anyone but Vercel
 
-| # | Env var | Required for | Where to get it | Vercel dashboard status (✓ / ✗) |
-|---|---------|--------------|-----------------|-------------------------------|
-| 1 | `VENICE_API_KEY` | `/api/generate` (image generation) | https://venice.ai → API keys | |
-| 2 | `NEYNAR_API_KEY` | `/api/farcaster/webhook` (cast mentioned) | https://neynar.com → Developer Portal → API keys | |
-| 3 | `FARCASTER_BOT_FID` | `/api/farcaster/webhook` (bot identity) | Your bot's FID on Warpcast | |
-| 4 | `FARCASTER_SIGNER_UUID` | `/api/farcaster/webhook` (publishing replies) | https://neynar.com → Signers | |
-| 5 | `NEYNAR_WEBHOOK_SECRET` | `/api/farcaster/webhook` (HMAC signature) | Set when configuring webhook URL in Neynar dashboard | |
-| 6 | `BLOB_READ_WRITE_TOKEN` | Image archive → Vercel Blob | https://vercel.com/dashboard → Storage → Create Blob store | |
-| 7 | `UPSTASH_REDIS_REST_URL` | Rate-limit + history | https://console.upstash.com → Create Redis DB | |
-| 8 | `UPSTASH_REDIS_REST_TOKEN` | Rate-limit + history | Same as above | |
+| # | Env var | Studio | ASP | Required for |
+|---|---------|:--:|:--:|---|
+| 1 | `VENICE_API_KEY` | ✓ | ✓ | `/api/generate`, agent pipeline |
+| 2 | `BLOB_READ_WRITE_TOKEN` | ✓ | ✓ | Image archive → shared public `toka-blob` |
+| 3 | `BLOB_STORE_ID` | ✓ | ✓ | `store_s9IKHju2Z1m5gMx7` (with OIDC on Vercel) |
+| 4 | `STUDIO_URL` | ✓ | ✓ | Review links, demo kit static assets |
+| 5 | `ASP_URL` | ✓ | ✓ | agent.json service URL |
+| 6 | `TOKA_DEPLOYMENT` | ✓ | ✓ | Route / middleware gating |
+| 7 | `REDIS_URL` | ✓ | ✓ | Drafts, brand kits, rate limits |
+| 8 | `NEYNAR_API_KEY` | ✓ | — | `/api/farcaster/webhook` (Studio only) |
+| 9 | `FARCASTER_BOT_FID` | ✓ | — | Farcaster bot identity |
+| 10 | `FARCASTER_SIGNER_UUID` | ✓ | — | Neynar signer |
+| 11 | `NEYNAR_WEBHOOK_SECRET` | ✓ | — | Webhook HMAC |
 
 ---
 
@@ -31,10 +47,17 @@ Each smoke test is one curl/click. Expected behavior is documented; deviations n
 ### 2.1 · Storage wiring (image archive)
 
 ```bash
+# ASP agent end-to-end — expect status "completed" and a public Blob URL
+curl -s -X POST "https://wowowify-asp.vercel.app/api/agent" \
+  -H "Content-Type: application/json" \
+  -d '{"command":"Soft blue gradient launch background","parameters":{"brandKitId":"demo-launch","formats":["square"]}}'
+```
+
+```bash
 curl -sI "https://wowowify.vercel.app/api/image?id=smoke-test-$RANDOM"
 ```
 
-**Expected**: 404 (id doesn't exist, but route returns — meaning BLOB + dev-fallback wiring is healthy). 500 means BLOB_READ_WRITE_TOKEN isn't configured. 200 with bytes means the ID unexpectedly exists, but that's a benign pass-through.
+**Expected**: Agent POST returns `completed` with `*.public.blob.vercel-storage.com` URLs. Image route 404 for unknown id is healthy; 500 means Blob env is misconfigured (often private store + `access: "public"`).
 
 ### 2.2 · Webhook signature enforcement
 

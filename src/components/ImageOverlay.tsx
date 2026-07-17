@@ -7,6 +7,7 @@ import { AdjustStage } from "./stages/AdjustStage";
 import { GenerateModal } from "./modals/GenerateModal";
 import { LoadingText } from "./LoadingText";
 import { StudioStepper } from "./studio/StudioStepper";
+import { DraftReviewBanner } from "./studio/DraftReviewBanner";
 import { BrandKitPanel, type BrandKitDefaults } from "./studio/BrandKitPanel";
 import type { BrandKit } from "@/lib/brand-kits";
 import type { CampaignFormat } from "@/lib/agent-types";
@@ -716,9 +717,12 @@ export default function ImageOverlay() {
     setTextControls((prev) => ({ ...prev, [key]: value }));
   };
 
+  const draftId = searchParams?.get("draftId") ?? undefined;
+
   return (
     <div className="flex flex-col items-center gap-4 p-2 sm:p-4">
       <div className="w-full max-w-4xl">
+        <DraftReviewBanner draftId={draftId} />
         <StudioStepper stage={stage} />
 
         {stage === "initial" && (

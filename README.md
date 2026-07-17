@@ -56,6 +56,8 @@ The Studio and the public ASP share composition logic, but do not need the same 
 
 ### Split deploy (production)
 
+See **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** for the full runbook: shared public Blob store (`toka-blob`), git-only ASP deploys (avoid CLI `vercel redeploy`), and env wiring.
+
 | Variable | Studio | ASP |
 |---|---|---|
 | `TOKA_DEPLOYMENT` | `studio` or `all` (default) | `asp` |

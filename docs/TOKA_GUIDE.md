@@ -1,5 +1,7 @@
 # @toka Bot Quick Guide
 
+> **Deploying?** See [DEPLOYMENT.md](./DEPLOYMENT.md) for the Studio + ASP split, shared Blob store, and git-only ASP deploy rule.
+
 ## What is @toka?
 
 @toka is an agentic brand studio that combines generative imagery with exact logo and text composition. It helps agents and people turn a creative brief into publication-ready social artwork without asking an image model to redraw or distort the supplied brand mark.

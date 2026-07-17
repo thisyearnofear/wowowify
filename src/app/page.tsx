@@ -7,6 +7,7 @@ import Navigation from "@/components/Navigation";
 import { Suspense } from "react";
 import { LoadingText } from "@/components/LoadingText";
 import { STUDIO_COPY } from "@/lib/studio-copy";
+import { StudioHero } from "@/components/studio/StudioHero";
 
 export default function Home() {
   return (
@@ -23,21 +24,14 @@ export default function Home() {
               className="w-28 sm:w-32 h-auto drop-shadow-lg"
               priority
             />
-            <div className="max-w-lg">
-              <h1
-                className="text-xl sm:text-2xl font-bold tracking-tight"
-                style={{ color: "var(--color-text)" }}
-              >
-                {STUDIO_COPY.name}
-              </h1>
-              <p
-                className="mt-1 text-sm sm:text-base"
-                style={{ color: "var(--color-text-secondary)" }}
-              >
-                {STUDIO_COPY.tagline}
-              </p>
-            </div>
+            <h1
+              className="text-xl sm:text-2xl font-bold tracking-tight"
+              style={{ color: "var(--color-text)" }}
+            >
+              {STUDIO_COPY.name}
+            </h1>
           </div>
+          <StudioHero />
           <Suspense
             fallback={
               <div className="flex justify-center py-12">
