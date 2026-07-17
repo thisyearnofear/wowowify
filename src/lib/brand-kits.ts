@@ -7,7 +7,7 @@ import {
   getRedisClient,
   setInMemoryData,
 } from "@/lib/redis";
-import { APP_URL } from "@/lib/env";
+import { STUDIO_URL } from "@/lib/deployment";
 import {
   getSeedBrandKit,
   listSeedBrandKits,
@@ -138,7 +138,7 @@ async function writeKit(kit: BrandKit): Promise<void> {
 }
 
 async function ensureSeedBrandKits(): Promise<void> {
-  const seeds = listSeedBrandKits(APP_URL);
+  const seeds = listSeedBrandKits(STUDIO_URL);
   const ids = await readIndex();
   let nextIds = [...ids];
 
@@ -149,6 +149,8 @@ async function ensureSeedBrandKits(): Promise<void> {
       if (!nextIds.includes(seed.id)) {
         nextIds = [seed.id, ...nextIds];
       }
+    } else if (existing.logoUrl !== seed.logoUrl) {
+      await writeKit({ ...existing, logoUrl: seed.logoUrl, updatedAt: seed.updatedAt });
     }
   }
 
@@ -168,7 +170,7 @@ export async function getBrandKit(id: string): Promise<BrandKit | null> {
   await ensureSeedBrandKits();
   const kit = await readKit(id);
   if (kit) return kit;
-  return getSeedBrandKit(id, APP_URL);
+  return getSeedBrandKit(id, STUDIO_URL);
 }
 
 export async function saveBrandKit(input: BrandKitInput): Promise<BrandKit> {

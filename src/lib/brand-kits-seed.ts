@@ -35,7 +35,7 @@ export function buildDemoLaunchKit(appUrl: string = STUDIO_URL): BrandKit {
 
 export const SEED_BRAND_KIT_BUILDERS = [buildDemoLaunchKit] as const;
 
-export function getSeedBrandKit(id: string, appUrl: string = APP_URL): BrandKit | null {
+export function getSeedBrandKit(id: string, appUrl: string = STUDIO_URL): BrandKit | null {
   if (
     id === DEMO_LAUNCH_KIT_ID ||
     (LEGACY_LAUNCH_KIT_IDS as readonly string[]).includes(id)
@@ -45,6 +45,6 @@ export function getSeedBrandKit(id: string, appUrl: string = APP_URL): BrandKit 
   return null;
 }
 
-export function listSeedBrandKits(appUrl: string = APP_URL): BrandKit[] {
+export function listSeedBrandKits(appUrl: string = STUDIO_URL): BrandKit[] {
   return SEED_BRAND_KIT_BUILDERS.map((builder) => builder(appUrl));
 }
