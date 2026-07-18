@@ -13,8 +13,10 @@ import { uploadLogoFile } from "@/lib/upload-logo-client";
 import { STUDIO_COPY } from "@/lib/studio-copy";
 import { BRAND } from "@/lib/brand";
 import { BrandKitPanel } from "@/components/studio/BrandKitPanel";
+import { BrandKitHero } from "@/components/studio/BrandKitHero";
 import { FormatSelector } from "@/components/studio/FormatSelector";
 import { BuilderStrip } from "@/components/studio/BuilderStrip";
+import { DEMO_LAUNCH_KIT_ID } from "@/lib/brand-kits-seed";
 
 const LoadingIndicator = () => (
   <div className="flex flex-col items-center justify-center py-4">
@@ -110,6 +112,17 @@ function AgentContent() {
         toast.showError("Command in URL was malformed");
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (brandKitId) return;
+    void fetch(`/api/brand-kits/${DEMO_LAUNCH_KIT_ID}`)
+      .then((response) => response.json())
+      .then((data: { kit?: BrandKit }) => {
+        if (data.kit) applyBrandKit(data.kit);
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -317,6 +330,8 @@ function AgentContent() {
           {STUDIO_COPY.command.subtitle}
         </p>
       </div>
+
+      <BrandKitHero variant="agent" />
 
       <form onSubmit={handleSubmit} className="mb-8 space-y-5">
         <BrandKitPanel onLoad={applyBrandKit} compact />

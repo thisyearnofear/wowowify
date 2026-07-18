@@ -71,10 +71,10 @@ Private stores + `access: "public"` fail with a Blob write error — migrate to 
 | `NEXT_PUBLIC_ASP_URL` | ASP URL | optional | Builder strip copy links |
 | `BLOB_READ_WRITE_TOKEN` | shared store token | shared store token | From linked `toka-blob` |
 | `BLOB_STORE_ID` | `store_s9IKHju2Z1m5gMx7` | same | Required with OIDC on Vercel |
-| `VENICE_API_KEY` | ✓ | ✓ | Image generation (primary) |
-| `RUNWARE_API_KEY` | optional | optional | Runware fallback when Venice fails |
+| `VENICE_API_KEY` | ✓ | ✓ | Image generation (fallback) |
+| `RUNWARE_API_KEY` | ✓ | ✓ | Image generation (primary) |
 | `RUNWARE_MODEL` | optional | optional | Default `runware:100@1` (FLUX Schnell) |
-| `IMAGE_GEN_RUNWARE_FALLBACK` | optional | optional | `false` disables fallback even if Runware key set |
+| `IMAGE_GEN_FALLBACK_ENABLED` | optional | optional | `false` disables Venice fallback when Runware fails |
 | `REDIS_URL` | ✓ | ✓ | Drafts, brand kits, rate limits |
 | `AGENT_RATE_LIMIT_MAX` | optional | optional | ASP: default 10/hr/IP on `/api/agent` |
 | `AGENT_DAILY_MAX` | optional | optional | ASP: default 100 completed gens/day (UTC) |

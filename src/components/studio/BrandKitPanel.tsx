@@ -93,6 +93,29 @@ export function BrandKitPanel({
       className={panelClass}
       style={isDark ? undefined : { borderColor: "var(--color-border)" }}
     >
+      <div className="space-y-1">
+        <p
+          className="font-semibold"
+          style={{ color: isDark ? "#f3f4f6" : "var(--color-text)" }}
+        >
+          {STUDIO_COPY.brandKit.title}
+        </p>
+        <p
+          className="text-xs"
+          style={{ color: isDark ? "#9ca3af" : "var(--color-text-secondary)" }}
+        >
+          {STUDIO_COPY.brandKit.subtitle}
+        </p>
+        {!compact && (
+          <p
+            className="text-xs opacity-80"
+            style={{ color: isDark ? "#9ca3af" : "var(--color-text-secondary)" }}
+          >
+            {STUDIO_COPY.brandKit.demoHint}
+          </p>
+        )}
+      </div>
+
       <div className="space-y-2">
         <label
           className="block font-medium"

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { STUDIO_COPY } from "@/lib/studio-copy";
+import { BrandKitHero } from "@/components/studio/BrandKitHero";
 
 const ACTIVE_PATHS = [
   {
@@ -16,33 +17,37 @@ const ACTIVE_PATHS = [
 
 export function StudioHero() {
   return (
-    <section className="w-full max-w-3xl mx-auto mb-6 text-center space-y-4">
-      <p
-        className="text-xs font-semibold uppercase tracking-wider"
-        style={{ color: "var(--color-wowowify)" }}
-      >
-        {STUDIO_COPY.portfolioLine}
-      </p>
-      <h2
-        className="text-lg sm:text-xl font-bold tracking-tight leading-snug"
-        style={{ color: "var(--color-text)" }}
-      >
-        {STUDIO_COPY.headline}
-      </h2>
-      <p
-        className="text-sm sm:text-base max-w-xl mx-auto"
-        style={{ color: "var(--color-text-secondary)" }}
-      >
-        {STUDIO_COPY.tagline}
-      </p>
-      <p
-        className="text-xs max-w-md mx-auto"
-        style={{ color: "var(--color-text-secondary)" }}
-      >
-        {STUDIO_COPY.audience}
-      </p>
+    <section className="w-full max-w-3xl mx-auto mb-6 space-y-6">
+      <div className="text-center space-y-2">
+        <p
+          className="text-xs font-semibold uppercase tracking-wider"
+          style={{ color: "var(--color-wowowify)" }}
+        >
+          {STUDIO_COPY.portfolioLine}
+        </p>
+        <h2
+          className="text-lg sm:text-xl font-bold tracking-tight leading-snug"
+          style={{ color: "var(--color-text)" }}
+        >
+          {STUDIO_COPY.headline}
+        </h2>
+        <p
+          className="text-sm sm:text-base max-w-xl mx-auto"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
+          {STUDIO_COPY.tagline}
+        </p>
+        <p
+          className="text-xs max-w-md mx-auto"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
+          {STUDIO_COPY.audience}
+        </p>
+      </div>
 
-      <div className="pt-2">
+      <BrandKitHero variant="studio" />
+
+      <div className="text-center pt-2">
         <p
           className="text-xs font-medium mb-3"
           style={{ color: "var(--color-text-secondary)" }}

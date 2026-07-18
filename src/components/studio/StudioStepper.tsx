@@ -1,8 +1,8 @@
 import type { Stage } from "@/components/ImageOverlay";
 
 const STEPS = [
-  { id: "initial" as const, label: "Brief" },
-  { id: "style" as const, label: "Brand" },
+  { id: "initial" as const, label: "Brand Kit" },
+  { id: "style" as const, label: "Wowowify" },
   { id: "adjust" as const, label: "Refine" },
 ] as const;
 

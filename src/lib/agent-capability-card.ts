@@ -15,16 +15,34 @@ export function getAgentCapabilityCard(
 ) {
   return {
     schema: "wowowify/agent-capability/v1",
-    name: `${BRAND.product} — brand-safe campaign creative`,
-    version: "1.3.0",
+    name: `${BRAND.product} Brand Kit v1 — agent-callable campaign production`,
+    version: "1.4.0",
     description:
-      "Persidian agent that creates publication-ready creative from a campaign brief and an exact logo. AI generates the scene; Wowowify composes your mark.",
+      "Save logo, placement, copy, and formats once as a Brand Kit. Every POST /api/agent call returns brand-exact, multi-format campaign assets with a human review link — not a one-off chat image.",
     protocol: "A2MCP",
     portfolio: BRAND.portfolio,
     deployment: {
       aspUrl,
       studioUrl,
       mode: process.env.TOKA_DEPLOYMENT || "all",
+    },
+    brandKit: {
+      hero: true,
+      version: "1",
+      summary:
+        "Persistent brand contract for agents — logo compositing, copy defaults, and output formats by id.",
+      parameter: "parameters.brandKitId",
+      demoKitId: DEMO_LAUNCH_KIT_ID,
+      guarantees: [
+        "Exact logo compositing — uploaded mark is never AI-redrawn",
+        "Multi-format campaign kit from one call (square, landscape, portrait)",
+        "Human approval via studioReviewUrl; optional provenance receipt",
+      ],
+      endpoints: {
+        list: `${aspUrl}/api/brand-kits`,
+        get: `${aspUrl}/api/brand-kits/{id}`,
+        create: `${aspUrl}/api/brand-kits`,
+      },
     },
     endpoints: {
       service: `${aspUrl}/api/agent`,
@@ -42,15 +60,15 @@ export function getAgentCapabilityCard(
       command:
         "string — natural language campaign brief (optional if parameters supplied)",
       parameters: {
+        brandKitId: `required for Brand Kit v1 flow — saved kit id (demo: "${DEMO_LAUNCH_KIT_ID}")`,
         logoUrl:
-          "public HTTP(S) image URL for an exact brand mark (optional — or POST /api/upload-logo first)",
-        brandKitId: `saved brand kit id (optional — demo kit: "${DEMO_LAUNCH_KIT_ID}")`,
+          "public HTTP(S) image URL override (optional when brandKitId is set — or POST /api/upload-logo)",
         baseImageUrl: "public HTTP(S) image URL (optional)",
         prompt: "string override for extracted brief (optional)",
         overlayMode: "community preset name (optional)",
-        text: "campaign copy controls (optional)",
-        controls: "logo placement, scale, color, and opacity (optional)",
-        formats: `${CAMPAIGN_FORMATS.join(" | ")} — optional multi-format campaign kit`,
+        text: "campaign copy controls override (optional)",
+        controls: "logo placement override (optional)",
+        formats: `${CAMPAIGN_FORMATS.join(" | ")} — multi-format kit (defaults from brand kit when omitted)`,
       },
     },
     output: {
@@ -82,7 +100,7 @@ export function getAgentCapabilityCard(
       offchain: `${aspUrl}/api/provenance`,
       network: getProvenanceNetwork(),
       description:
-        "Optional receipt with specHash + assetHash. Chain binding is deployment-specific; source logos stay offchain by default.",
+        "Optional receipt with specHash + assetHash tied to brandKitId + brief. Chain binding is deployment-specific; source logos stay offchain by default.",
     },
     demo: {
       brandKitId: DEMO_LAUNCH_KIT_ID,

@@ -14,7 +14,7 @@ Wowowify is listed on OKX.AI as **A2MCP / API service / 0 USDT** while we prove 
 | Daily cap | **100 completed generations/day** (ASP default) |
 | Studio | **20 req/hour/IP**, no daily cap |
 
-Every free marketplace call still costs **Venice + Vercel compute** — guardrails limit runaway spend, not unit economics.
+Every free marketplace call still costs **Runware/Venice + Vercel compute** — guardrails limit runaway spend, not unit economics.
 
 ---
 
@@ -40,11 +40,11 @@ Set a **Venice dashboard spend alert** manually (Venice console) — the repo ca
 
 | Provider | Role | Model | ~Cost @ 512² |
 |---|---|---|---|
-| **Venice** | Primary | `venice-sd35` | ~$0.02–0.05 (verify dashboard) |
-| **Runware** | Fallback | `runware:100@1` (FLUX Schnell) | ~$0.0006 |
+| **Runware** | Primary | `runware:100@1` (FLUX Schnell) | ~$0.0006 |
+| **Venice** | Fallback | `venice-sd35` | ~$0.02–0.05 (verify dashboard) |
 | Runware alt | Faster / prompt-tight | `prunaai:1@1` (P-Image) | ~$0.0044 @ 1024² |
 
-Pipeline: `generateImageWithFallback()` tries Venice first; on failure uses Runware when `RUNWARE_API_KEY` is set. Set `IMAGE_GEN_RUNWARE_FALLBACK=false` to disable.
+Pipeline: `generateImageWithFallback()` tries Runware first; on failure uses Venice when `VENICE_API_KEY` is set. Set `IMAGE_GEN_FALLBACK_ENABLED=false` to disable fallback.
 
 **Runware wallet:** API key auth works before credits are loaded; generations return `Insufficient credits` until you top up at [my.runware.ai/wallet](https://my.runware.ai/wallet).
 

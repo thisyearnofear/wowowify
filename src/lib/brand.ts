@@ -1,7 +1,7 @@
 /**
  * Canonical product & portfolio naming — single source of truth.
  *
- * Wowowify is the Persidian agent for brand-safe campaign creative.
+ * Wowowify is the Persidian agent for brand-exact, multi-format campaign kits.
  * "wowowify" is both the product name and the compositing verb.
  * Farcaster integration is deferred until ASP is live on a custom domain.
  */
@@ -10,11 +10,12 @@ export const BRAND = {
   product: "Wowowify",
   portfolio: "Persidian",
   verb: "wowowify",
+  /** Hero line — Brand Kit v1 is the product, not generic image gen. */
+  headline: "Brand Kit v1 — upload once, ship everywhere.",
   tagline:
-    "Generate the scene. Wowowify your exact mark and copy — never redrawn, never hallucinated.",
-  headline: "AI art that keeps your logo exact.",
+    "Save your logo, placement, copy, and formats as a Brand Kit. Every Studio session and agent call returns brand-exact campaign assets — never redrawn, never hallucinated.",
   audience:
-    "Enterprise teams and agent builders shipping launch creative on Persidian.",
+    "Crypto launch teams, OKX agent builders, and marketing orchestrators who need compliant creative at API speed.",
   /** Target production hosts (set via env until DNS is wired). */
   urls: {
     studio: "https://wowowify.persidian.com",

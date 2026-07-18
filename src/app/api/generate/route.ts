@@ -7,7 +7,7 @@ import { generateImageWithFallback } from "@/lib/services/image-generation";
 
 const ALLOWED_MODELS = ["venice-sd35", "flux-2-pro", "hidream"] as const;
 const DEFAULT_MODEL = "venice-sd35";
-const TIMEOUT_MS = 10000; // 10 seconds timeout - Vercel has 10s limit
+const TIMEOUT_MS = 30000; // Allow Runware attempt + Venice fallback (matches command-router)
 
 // Mark the route as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";

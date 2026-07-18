@@ -8,21 +8,48 @@ export const STUDIO_COPY = {
   audience: BRAND.audience,
   portfolioLine: `Part of ${BRAND.portfolio}`,
   steps: {
+    kit: "Brand Kit",
     brief: "Brief",
     brand: "Wowowify",
     refine: "Refine",
     export: "Export",
   },
+  brandKitV1: {
+    badge: "Brand Kit v1",
+    headline: "Upload once. Every call returns on-brand kits.",
+    promise:
+      "ChatGPT can paint a picture. Wowowify ships publication-ready campaign kits with your exact mark — composited, multi-format, and agent-callable.",
+    pillars: [
+      {
+        title: "Brand-exact",
+        body: "Your real logo file, composited pixel-for-pixel. AI never redraws your mark.",
+      },
+      {
+        title: "Multi-format",
+        body: "One brief → square, landscape, and portrait crops from the same composition.",
+      },
+      {
+        title: "Agent-callable",
+        body: "Pass brandKitId to POST /api/agent. OKX agents and your launch pipeline share the same kit.",
+      },
+    ],
+    apiLine:
+      "Agents: POST /api/agent with parameters.brandKitId — demo kit demo-launch ships three formats.",
+    complianceLine:
+      "Optional provenance receipt ties each asset to brief + kit + logo for audit trails.",
+    ctaStudio: "Load a kit below, then write your brief.",
+    ctaAgent: "Start with a Brand Kit — manual logo fields are optional overrides.",
+  },
   paths: {
     title: "Two ways in",
     studio: {
       label: "Studio",
-      hint: "Upload a brief and logo — wowowify, refine, and export.",
+      hint: "Load a Brand Kit, wowowify a brief, refine, and export every format.",
       cta: "Open Studio",
     },
     agent: {
       label: "Agent API",
-      hint: "Your agent calls the same pipeline — hands humans a review link.",
+      hint: "Same Brand Kit contract — agents pass brandKitId and get a review link.",
       cta: "Open Command",
     },
     farcaster: {
@@ -62,12 +89,15 @@ export const STUDIO_COPY = {
     successHint: "Wowowified — your logo was composited, not redrawn.",
   },
   brandKit: {
+    title: "Brand Kit",
+    subtitle: "Logo, placement, copy, and formats — reused on every run.",
     load: "Load brand kit",
     save: "Save brand kit",
-    namePlaceholder: "Kit name (e.g. Demo Launch)",
-    empty: "No saved brand kits yet.",
-    saved: "Brand kit saved.",
-    loaded: "Brand kit loaded.",
+    namePlaceholder: "Kit name (e.g. Q3 Launch)",
+    empty: "No saved brand kits yet — save one after you refine placement.",
+    saved: "Brand kit saved. Agents can call it by id.",
+    loaded: "Brand kit loaded — logo and defaults applied.",
+    demoHint: "Try Demo Launch to see a three-format kit in one call.",
   },
   nav: {
     studio: "Studio",
@@ -77,7 +107,8 @@ export const STUDIO_COPY = {
   },
   command: {
     title: "Command",
-    subtitle: `Same brand-safe pipeline as ${BRAND.product} Studio — built for agents and technical users.`,
+    subtitle:
+      "Brand Kit v1 for agents — pass brandKitId, get multi-format kits and a Studio review link.",
     preview: "Preview command",
     create: "Wowowify artwork",
     openStudio: "Open in Studio",
@@ -96,7 +127,7 @@ export const STUDIO_COPY = {
     docs: "Deployment docs",
   },
   footer: {
-    tagline: `${BRAND.product} — brand-safe creative on ${BRAND.portfolio}.`,
+    tagline: `${BRAND.product} Brand Kit v1 — brand-exact campaign production on ${BRAND.portfolio}.`,
   },
   admin: {
     title: "Recent campaigns",

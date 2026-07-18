@@ -1,5 +1,5 @@
 /**
- * Image generation with Venice primary + Runware fallback for ASP/Studio reliability.
+ * Image generation with Runware primary + Venice fallback for ASP/Studio reliability.
  */
 
 import { logger } from "@/lib/logger";
@@ -30,41 +30,29 @@ function runwareConfigured(): boolean {
 }
 
 function fallbackEnabled(): boolean {
-  const flag = process.env.IMAGE_GEN_RUNWARE_FALLBACK?.trim().toLowerCase();
+  const legacy = process.env.IMAGE_GEN_RUNWARE_FALLBACK?.trim().toLowerCase();
+  if (legacy === "false" || legacy === "0") return false;
+
+  const flag = process.env.IMAGE_GEN_FALLBACK_ENABLED?.trim().toLowerCase();
   if (flag === "false" || flag === "0") return false;
-  return runwareConfigured();
+  return true;
 }
 
 /**
- * Generate a PNG buffer. Tries Venice first when configured; on failure falls back
- * to Runware when `RUNWARE_API_KEY` is set (unless `IMAGE_GEN_RUNWARE_FALLBACK=false`).
+ * Generate a PNG buffer. Tries Runware first when configured; on failure falls back
+ * to Venice when `VENICE_API_KEY` is set (unless fallback is disabled via env).
  */
 export async function generateImageWithFallback(
   prompt: string,
   abortSignal: AbortSignal,
   options: GenerateImageOptions = {},
 ): Promise<GenerateImageResult> {
-  const veniceError: Error[] = [];
-
-  if (veniceConfigured()) {
-    try {
-      const buffer = await generateViaVenice(prompt, abortSignal);
-      return { buffer, provider: "venice", model: "venice-sd35" };
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      veniceError.push(err);
-      logger.warn("Venice image generation failed", { error: err.message });
-
-      if (!fallbackEnabled()) {
-        throw err;
-      }
-    }
-  }
+  const primaryError: Error[] = [];
 
   if (runwareConfigured()) {
     try {
       const result = await generateViaRunware(prompt, abortSignal, options);
-      logger.info("Image generated via Runware fallback", {
+      logger.info("Image generated via Runware", {
         model: result.model,
         costUsd: result.costUsd,
       });
@@ -75,20 +63,36 @@ export async function generateImageWithFallback(
         costUsd: result.costUsd,
       };
     } catch (error) {
-      const runwareErr = error instanceof Error ? error : new Error(String(error));
-      logger.error("Runware image generation failed", { error: runwareErr.message });
+      const err = error instanceof Error ? error : new Error(String(error));
+      primaryError.push(err);
+      logger.warn("Runware image generation failed", { error: err.message });
 
-      if (veniceError.length > 0) {
-        throw new Error(
-          `Image generation failed (Venice: ${veniceError[0].message}; Runware: ${runwareErr.message})`,
-        );
+      if (!fallbackEnabled() || !veniceConfigured()) {
+        throw err;
       }
-      throw runwareErr;
     }
   }
 
-  if (veniceError.length > 0) {
-    throw veniceError[0];
+  if (veniceConfigured()) {
+    try {
+      const buffer = await generateViaVenice(prompt, abortSignal);
+      logger.info("Image generated via Venice fallback");
+      return { buffer, provider: "venice", model: "venice-sd35" };
+    } catch (error) {
+      const veniceErr = error instanceof Error ? error : new Error(String(error));
+      logger.error("Venice image generation failed", { error: veniceErr.message });
+
+      if (primaryError.length > 0) {
+        throw new Error(
+          `Image generation failed (Runware: ${primaryError[0].message}; Venice: ${veniceErr.message})`,
+        );
+      }
+      throw veniceErr;
+    }
+  }
+
+  if (primaryError.length > 0) {
+    throw primaryError[0];
   }
 
   logger.error("No image generation provider configured");

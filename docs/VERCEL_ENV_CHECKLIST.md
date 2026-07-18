@@ -26,8 +26,8 @@ Vercel dashboard → Project → Settings → Environment Variables. For each va
 
 | # | Env var | Studio | ASP | Required for |
 |---|---------|:--:|:--:|---|
-| 1 | `VENICE_API_KEY` | ✓ | ✓ | `/api/generate`, agent pipeline (primary) |
-| 1b | `RUNWARE_API_KEY` | optional | optional | Venice fallback — see [MONETIZATION.md](./MONETIZATION.md#image-generation-reliability) |
+| 1 | `RUNWARE_API_KEY` | ✓ | ✓ | `/api/generate`, agent pipeline (primary) |
+| 1b | `VENICE_API_KEY` | optional | optional | Runware fallback — see [MONETIZATION.md](./MONETIZATION.md#image-generation-reliability) |
 | 2 | `BLOB_READ_WRITE_TOKEN` | ✓ | ✓ | Image archive → shared public `toka-blob` |
 | 3 | `BLOB_STORE_ID` | ✓ | ✓ | `store_s9IKHju2Z1m5gMx7` (with OIDC on Vercel) |
 | 4 | `STUDIO_URL` | ✓ | ✓ | Review links, demo kit static assets |

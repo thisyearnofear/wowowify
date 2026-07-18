@@ -85,9 +85,12 @@ describe("getSeedBrandKit", () => {
 });
 
 describe("getAgentCapabilityCard", () => {
-  it("exposes discovery and demo brand kit", () => {
+  it("exposes Brand Kit v1 discovery and demo brand kit", () => {
     const card = getAgentCapabilityCard("https://asp.example");
     expect(card.schema).toBe("wowowify/agent-capability/v1");
+    expect(card.version).toBe("1.4.0");
+    expect(card.brandKit.hero).toBe(true);
+    expect(card.brandKit.demoKitId).toBe(DEMO_LAUNCH_KIT_ID);
     expect(card.endpoints.discovery).toBe(
       "https://asp.example/.well-known/agent.json",
     );
