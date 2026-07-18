@@ -28,6 +28,8 @@ export function buildDemoLaunchKit(appUrl: string = STUDIO_URL): BrandKit {
       overlayAlpha: 0,
     },
     formats: ["square", "landscape", "portrait"],
+    version: 1,
+    approved: true,
     createdAt: now,
     updatedAt: now,
   };

@@ -75,6 +75,7 @@ Private stores + `access: "public"` fail with a Blob write error — migrate to 
 | `RUNWARE_API_KEY` | ✓ | ✓ | Image generation (primary) |
 | `RUNWARE_MODEL` | optional | optional | Default `runware:100@1` (FLUX Schnell) |
 | `IMAGE_GEN_FALLBACK_ENABLED` | optional | optional | `false` disables Venice fallback when Runware fails |
+| `BRAND_KIT_REQUIRED` | optional | optional | Default `true` — set `false` to disable Brand Kit v1 enforcement on `/api/agent` |
 | `REDIS_URL` | ✓ | ✓ | Drafts, brand kits, rate limits |
 | `AGENT_RATE_LIMIT_MAX` | optional | optional | ASP: default 10/hr/IP on `/api/agent` |
 | `AGENT_DAILY_MAX` | optional | optional | ASP: default 100 completed gens/day (UTC) |

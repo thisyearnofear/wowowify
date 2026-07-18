@@ -55,6 +55,8 @@ export interface AgentResponse {
   /** Persisted review draft for human approval in Studio */
   draftId?: string;
   studioReviewUrl?: string;
+  /** Off-chain provenance receipt when brandKitId was used */
+  provenanceReceiptId?: string;
 }
 
 export interface CampaignAsset extends AgentResponse {
@@ -68,6 +70,7 @@ export interface CampaignKitResponse {
   error?: string;
   draftId?: string;
   studioReviewUrl?: string;
+  provenanceReceiptId?: string;
 }
 
 export interface ParsedCommand {

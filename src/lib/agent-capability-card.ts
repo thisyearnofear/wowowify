@@ -16,7 +16,7 @@ export function getAgentCapabilityCard(
   return {
     schema: "wowowify/agent-capability/v1",
     name: `${BRAND.product} Brand Kit v1 — agent-callable campaign production`,
-    version: "1.4.0",
+    version: "1.5.0",
     description:
       "Save logo, placement, copy, and formats once as a Brand Kit. Every POST /api/agent call returns brand-exact, multi-format campaign assets with a human review link — not a one-off chat image.",
     protocol: "A2MCP",
@@ -32,6 +32,7 @@ export function getAgentCapabilityCard(
       summary:
         "Persistent brand contract for agents — logo compositing, copy defaults, and output formats by id.",
       parameter: "parameters.brandKitId",
+      versionPin: "Optional pin: demo-launch@1 (must match kit.version)",
       demoKitId: DEMO_LAUNCH_KIT_ID,
       guarantees: [
         "Exact logo compositing — uploaded mark is never AI-redrawn",
@@ -60,7 +61,7 @@ export function getAgentCapabilityCard(
       command:
         "string — natural language campaign brief (optional if parameters supplied)",
       parameters: {
-        brandKitId: `required for Brand Kit v1 flow — saved kit id (demo: "${DEMO_LAUNCH_KIT_ID}")`,
+        brandKitId: `required — saved kit id or version pin (demo: "${DEMO_LAUNCH_KIT_ID}" or "${DEMO_LAUNCH_KIT_ID}@1")`,
         logoUrl:
           "public HTTP(S) image URL override (optional when brandKitId is set — or POST /api/upload-logo)",
         baseImageUrl: "public HTTP(S) image URL (optional)",
@@ -79,6 +80,7 @@ export function getAgentCapabilityCard(
         "array of { format, resultUrl, previewUrl } when parameters.formats is set",
       draftId: "persisted review draft id for human approval",
       studioReviewUrl: "open in Studio for human approval",
+      provenanceReceiptId: "off-chain receipt id when brandKitId is set (auto-issued on success)",
     },
     humanApproval: {
       description:

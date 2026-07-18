@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import {
-  CAMPAIGN_FORMATS,
   CampaignFormat,
   ParsedCommand,
 } from "@/lib/agent-types";
@@ -11,15 +10,19 @@ import { getRateLimitInfo } from "@/lib/rate-limiter";
 import { ensureFontsAreRegistered } from "@/lib/image-processor";
 import { getImageService, InterfaceType } from "@/lib/services";
 import { validateOverlayMode } from "@/lib/config/overlays";
-import { getBrandKit, mergeBrandKitIntoCommand } from "@/lib/brand-kits";
+import { getBrandKit, getBrandKitByRef, mergeBrandKitIntoCommand, parseBrandKitRef } from "@/lib/brand-kits";
 import { getAgentCapabilityCard } from "@/lib/agent-capability-card";
-import { saveCampaignDraft } from "@/lib/campaign-drafts";
+import { finalizeCompletedAgentRun } from "@/lib/agent-completion";
 import { checkAgentPayment } from "@/lib/x402";
 import {
   checkAgentDailyCap,
   recordAgentCompletion,
 } from "@/lib/agent-usage";
-import type { CampaignKitResponse } from "@/lib/agent-types";
+import {
+  enforceBrandKitAgentContract,
+  isBrandKitContractEnabled,
+  normalizeCampaignFormats,
+} from "@/lib/brand-kit-contract";
 
 // Mark the route as dynamic to prevent static optimization
 export const dynamic = "force-dynamic";
@@ -34,39 +37,10 @@ export function GET(): Response {
   });
 }
 
-// Timeout for image processing — 10s to stay within Vercel Hobby (10s) function limit
-const TIMEOUT_MS = 10000;
+// Align with command-router pipeline (campaign kits + Runware/Venice fallback)
+export const maxDuration = 30;
 
-async function persistReviewDraft(options: {
-  command?: string;
-  brandKitId?: string;
-  formats?: CampaignFormat[] | null;
-  parsedCommand: ParsedCommand;
-  result: {
-    status: string;
-    previewUrl?: string;
-    resultUrl?: string;
-    assets?: CampaignKitResponse["assets"];
-    error?: string;
-  };
-}) {
-  if (options.result.status !== "completed") return null;
-  const draft = await saveCampaignDraft({
-    command: options.command || options.parsedCommand.prompt || "",
-    brief: options.parsedCommand.prompt,
-    brandKitId: options.brandKitId,
-    logoUrl: options.parsedCommand.logoUrl,
-    overlayMode: options.parsedCommand.overlayMode,
-    text: options.parsedCommand.text,
-    controls: options.parsedCommand.controls,
-    formats: options.formats || undefined,
-    previewUrl: options.result.previewUrl,
-    resultUrl: options.result.resultUrl,
-    assets: options.result.assets,
-    status: "completed",
-  });
-  return { draftId: draft.id, studioReviewUrl: draft.studioReviewUrl };
-}
+const TIMEOUT_MS = 30000;
 
 // Valid API keys for external agents
 const VALID_API_KEYS = {
@@ -195,24 +169,16 @@ export async function POST(request: Request): Promise<Response> {
     const walletAddressForOverlay = body.walletAddress as string;
     const parentImageUrl = body.parentImageUrl; // Extract parent image URL
     const requestedFormats = providedParameters?.formats;
+    const normalizedFormats = normalizeCampaignFormats(requestedFormats);
+    if (normalizedFormats !== null && "ok" in normalizedFormats && normalizedFormats.ok === false) {
+      return NextResponse.json(
+        { error: normalizedFormats.error },
+        { status: normalizedFormats.status, headers: responseHeaders },
+      );
+    }
     let campaignFormats: CampaignFormat[] | null = null;
-
-    if (requestedFormats !== undefined) {
-      if (
-        !Array.isArray(requestedFormats) ||
-        requestedFormats.length === 0 ||
-        requestedFormats.length > CAMPAIGN_FORMATS.length ||
-        !requestedFormats.every((format) =>
-          CAMPAIGN_FORMATS.includes(format as CampaignFormat),
-        )
-      ) {
-        return NextResponse.json(
-          { error: "formats must contain square, landscape, and/or portrait" },
-          { status: 400, headers: responseHeaders },
-        );
-      }
-
-      campaignFormats = [...new Set(requestedFormats)] as CampaignFormat[];
+    if (Array.isArray(normalizedFormats)) {
+      campaignFormats = normalizedFormats;
     }
 
     // Determine interface type based on request headers
@@ -264,17 +230,14 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    if (providedParameters?.brandKitId) {
-      const kit = await getBrandKit(providedParameters.brandKitId);
-      if (!kit) {
-        return NextResponse.json(
-          { error: "Brand kit not found" },
-          { status: 404, headers: responseHeaders },
-        );
-      }
-      parsedCommand = mergeBrandKitIntoCommand(parsedCommand, kit);
-      if (!campaignFormats && kit.formats?.length) {
-        campaignFormats = kit.formats;
+    const brandKitRef = providedParameters?.brandKitId as string | undefined;
+    let resolvedBrandKitId: string | undefined;
+    const loadedKit = brandKitRef ? await getBrandKitByRef(brandKitRef) : null;
+
+    if (loadedKit) {
+      parsedCommand = mergeBrandKitIntoCommand(parsedCommand, loadedKit);
+      if (!campaignFormats && loadedKit.formats?.length) {
+        campaignFormats = loadedKit.formats;
       }
     }
 
@@ -342,6 +305,31 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
+    const brandKitContractEnabled = isBrandKitContractEnabled();
+    if (brandKitContractEnabled) {
+      const kitForContract =
+        loadedKit ??
+        (brandKitRef ? await getBrandKit(parseBrandKitRef(brandKitRef).id) : null);
+      const contract = enforceBrandKitAgentContract({
+        brandKitRef,
+        kit: kitForContract,
+        parsedCommand,
+        requestedFormats: campaignFormats,
+        enforcementEnabled: true,
+      });
+      if (!contract.ok) {
+        incrementFailedRequests().catch(() => {});
+        return NextResponse.json(
+          { error: contract.error },
+          { status: contract.status, headers: responseHeaders },
+        );
+      }
+      campaignFormats = contract.formats;
+      resolvedBrandKitId = contract.brandKitId;
+    } else if (brandKitRef) {
+      resolvedBrandKitId = parseBrandKitRef(brandKitRef).id;
+    }
+
     try {
       logger.info("Processing agent command", {
         requestId,
@@ -361,9 +349,9 @@ export async function POST(request: Request): Promise<Response> {
         );
         const draftMeta =
           result.status === "completed"
-            ? await persistReviewDraft({
+            ? await finalizeCompletedAgentRun({
                 command,
-                brandKitId: providedParameters?.brandKitId,
+                brandKitId: resolvedBrandKitId ?? brandKitRef,
                 formats: campaignFormats,
                 parsedCommand,
                 result,
@@ -389,9 +377,9 @@ export async function POST(request: Request): Promise<Response> {
         isFarcaster
       );
 
-      const draftMeta = await persistReviewDraft({
+      const draftMeta = await finalizeCompletedAgentRun({
         command,
-        brandKitId: providedParameters?.brandKitId,
+        brandKitId: resolvedBrandKitId ?? brandKitRef,
         formats: campaignFormats,
         parsedCommand,
         result,

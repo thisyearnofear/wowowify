@@ -22,7 +22,19 @@ Two production interfaces:
 - **Studio** (humans): `https://wowowify.persidian.com` — load/save kits, wowowify, refine, export  
 - **Agent API** (machines): `POST /api/agent` on the ASP host — same kit contract, returns `draftId` + `studioReviewUrl`
 
-Demo kit: `demo-launch` (three formats, bundled logo on Studio).
+Demo kit: `demo-launch` (three formats, bundled logo on Studio). Pin a version with `demo-launch@1`.
+
+### Brand Kit v1 enforcement (default on)
+
+`POST /api/agent` enforces unless `BRAND_KIT_REQUIRED=false`:
+
+| Rule | Behavior |
+|---|---|
+| `parameters.brandKitId` | **Required** — plain id or version pin (`demo-launch@1`) |
+| Logo | Kit must include `logoUrl`, or pass `parameters.logoUrl` override |
+| Formats | From `parameters.formats` or kit defaults — at least one required |
+| Approval | Kit must have `approved: true` (demo seed kits are pre-approved; Studio saves with `approved: true`) |
+| Success payload | `draftId`, `studioReviewUrl`, and **`provenanceReceiptId`** when complete |
 
 Wallet / chain interaction is optional (x402, entitlements, provenance) — not required to create artwork.
 

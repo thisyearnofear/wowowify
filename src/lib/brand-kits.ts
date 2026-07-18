@@ -43,13 +43,43 @@ export interface BrandKit {
   text?: BrandKitText;
   controls?: BrandKitControls;
   formats?: CampaignFormat[];
+  /** Monotonic version — bump on each save; agents may pin id@version. */
+  version: number;
+  /** When false, POST /api/agent rejects the kit until approved. */
+  approved: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export type BrandKitInput = Omit<BrandKit, "id" | "createdAt" | "updatedAt"> & {
+export type BrandKitInput = Omit<
+  BrandKit,
+  "id" | "createdAt" | "updatedAt" | "version"
+> & {
   id?: string;
+  version?: number;
 };
+
+/** Parse `demo-launch` or version-pinned `demo-launch@2`. */
+export function parseBrandKitRef(ref: string): { id: string; version?: number } {
+  const trimmed = ref.trim();
+  const at = trimmed.lastIndexOf("@");
+  if (at <= 0) return { id: trimmed };
+
+  const id = trimmed.slice(0, at);
+  const version = Number.parseInt(trimmed.slice(at + 1), 10);
+  if (!Number.isFinite(version) || version < 1) {
+    return { id: trimmed };
+  }
+  return { id, version };
+}
+
+function normalizeKit(kit: BrandKit): BrandKit {
+  return {
+    ...kit,
+    version: kit.version ?? 1,
+    approved: kit.approved ?? true,
+  };
+}
 
 function sortByUpdated(kits: BrandKit[]): BrandKit[] {
   return [...kits].sort(
@@ -103,7 +133,7 @@ async function readKit(id: string): Promise<BrandKit | null> {
       const redis = getRedisClient();
       const raw = await executeWithTimeout(() => redis.get(key), 3000, null);
       if (!raw) return null;
-      return JSON.parse(raw) as BrandKit;
+      return normalizeKit(JSON.parse(raw) as BrandKit);
     } catch (error) {
       logger.warn("Brand kit read failed, using memory fallback", {
         id,
@@ -112,7 +142,8 @@ async function readKit(id: string): Promise<BrandKit | null> {
     }
   }
   const kits = getInMemoryData<BrandKit>("brand_kits:data");
-  return kits.find((kit) => kit.id === id) ?? null;
+  const found = kits.find((kit) => kit.id === id) ?? null;
+  return found ? normalizeKit(found) : null;
 }
 
 async function writeKit(kit: BrandKit): Promise<void> {
@@ -170,22 +201,34 @@ export async function getBrandKit(id: string): Promise<BrandKit | null> {
   await ensureSeedBrandKits();
   const kit = await readKit(id);
   if (kit) return kit;
-  return getSeedBrandKit(id, STUDIO_URL);
+  const seed = getSeedBrandKit(id, STUDIO_URL);
+  return seed ? normalizeKit(seed) : null;
+}
+
+/** Load a kit by id or version-pinned ref (`demo-launch@1`). */
+export async function getBrandKitByRef(ref: string): Promise<BrandKit | null> {
+  const { id, version } = parseBrandKitRef(ref);
+  const kit = await getBrandKit(id);
+  if (!kit) return null;
+  if (version !== undefined && kit.version !== version) return null;
+  return kit;
 }
 
 export async function saveBrandKit(input: BrandKitInput): Promise<BrandKit> {
   const now = new Date().toISOString();
   const existing = input.id ? await readKit(input.id) : null;
-  const kit: BrandKit = {
+  const kit: BrandKit = normalizeKit({
     id: input.id ?? uuidv4(),
     name: input.name.trim(),
     logoUrl: input.logoUrl?.trim() || undefined,
     text: input.text,
     controls: input.controls,
     formats: input.formats?.length ? [...new Set(input.formats)] : undefined,
+    version: existing ? existing.version + 1 : 1,
+    approved: input.approved ?? false,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
-  };
+  });
 
   if (!kit.name) {
     throw new Error("Brand kit name is required");

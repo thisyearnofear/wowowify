@@ -50,6 +50,8 @@ describe("mergeBrandKitIntoCommand", () => {
         name: "Demo",
         logoUrl: "https://example.com/kit.png",
         text: { content: "Default", position: "bottom" },
+        version: 1,
+        approved: true,
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
       },
@@ -88,9 +90,10 @@ describe("getAgentCapabilityCard", () => {
   it("exposes Brand Kit v1 discovery and demo brand kit", () => {
     const card = getAgentCapabilityCard("https://asp.example");
     expect(card.schema).toBe("wowowify/agent-capability/v1");
-    expect(card.version).toBe("1.4.0");
+    expect(card.version).toBe("1.5.0");
     expect(card.brandKit.hero).toBe(true);
     expect(card.brandKit.demoKitId).toBe(DEMO_LAUNCH_KIT_ID);
+    expect(card.brandKit.versionPin).toContain("@");
     expect(card.endpoints.discovery).toBe(
       "https://asp.example/.well-known/agent.json",
     );
@@ -103,6 +106,8 @@ describe("buildDemoLaunchKit", () => {
   it("ships square, landscape, and portrait defaults", () => {
     const kit = buildDemoLaunchKit("https://wowowify.example");
     expect(kit.id).toBe(DEMO_LAUNCH_KIT_ID);
+    expect(kit.version).toBe(1);
+    expect(kit.approved).toBe(true);
     expect(kit.formats).toEqual(["square", "landscape", "portrait"]);
     expect(kit.logoUrl).toContain("/demo/launch-mark.png");
   });

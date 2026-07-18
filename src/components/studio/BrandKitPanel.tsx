@@ -74,6 +74,7 @@ export function BrandKitPanel({
           text: payload.text,
           controls: payload.controls,
           formats: payload.formats,
+          approved: true,
         }),
       });
       if (!response.ok) {
